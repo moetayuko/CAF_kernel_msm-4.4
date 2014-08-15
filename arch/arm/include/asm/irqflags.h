@@ -28,8 +28,11 @@ static inline unsigned long arch_local_irq_save(void)
 
 	asm volatile(
 		"	mrs	%0, " IRQMASK_REG_NAME_R "	@ arch_local_irq_save\n"
-		"	cpsid	i"
-		: "=r" (flags) : : "memory", "cc");
+		"	tst	%0, %1\n"
+		"	bne	1f\n"
+		"	cpsid	i\n"
+		"1:"
+		: "=r" (flags) : "i" (IRQMASK_I_BIT) : "memory", "cc");
 	return flags;
 }
 
@@ -46,11 +49,24 @@ static inline void arch_local_irq_enable(void)
 #define arch_local_irq_disable arch_local_irq_disable
 static inline void arch_local_irq_disable(void)
 {
+	arch_local_irq_save();
+}
+
+/*
+ * restore saved IRQ & FIQ state
+ */
+#define arch_local_irq_restore arch_local_irq_restore
+static inline void arch_local_irq_restore(unsigned long flags)
+{
+	unsigned long temp;
+
 	asm volatile(
-		"	cpsid i			@ arch_local_irq_disable"
-		:
-		:
-		: "memory", "cc");
+		"	mrs	%0, " IRQMASK_REG_NAME_R "\n"
+		"	cmp	%0, %1\n"
+		"	beq	1f\n"
+		"	msr	" IRQMASK_REG_NAME_W ", %1	@ local_irq_restore\n"
+		"1:"
+		: "=&r" (temp) : "r" (flags) : "memory", "cc");
 }
 
 #define local_fiq_enable()  __asm__("cpsie f	@ __stf" : : : "memory", "cc")
@@ -145,8 +161,22 @@ static inline void arch_local_irq_disable(void)
 	: "memory", "cc");					\
 	})
 
+/*
+ * restore saved IRQ & FIQ state
+ */
+#define arch_local_irq_restore arch_local_irq_restore
+static inline void arch_local_irq_restore(unsigned long flags)
+{
+	asm volatile(
+		"	msr	" IRQMASK_REG_NAME_W ", %0	@ local_irq_restore"
+		:
+		: "r" (flags)
+		: "memory", "cc");
+}
+
 #define local_abt_enable()	do { } while (0)
 #define local_abt_disable()	do { } while (0)
+
 #endif
 
 /*
@@ -160,19 +190,6 @@ static inline unsigned long arch_local_save_flags(void)
 		"	mrs	%0, " IRQMASK_REG_NAME_R "	@ local_save_flags"
 		: "=r" (flags) : : "memory", "cc");
 	return flags;
-}
-
-/*
- * restore saved IRQ & FIQ state
- */
-#define arch_local_irq_restore arch_local_irq_restore
-static inline void arch_local_irq_restore(unsigned long flags)
-{
-	asm volatile(
-		"	msr	" IRQMASK_REG_NAME_W ", %0	@ local_irq_restore"
-		:
-		: "r" (flags)
-		: "memory", "cc");
 }
 
 #define arch_irqs_disabled_flags arch_irqs_disabled_flags
