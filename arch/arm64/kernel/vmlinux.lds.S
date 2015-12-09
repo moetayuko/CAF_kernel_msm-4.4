@@ -128,9 +128,6 @@ SECTIONS
 
 	PERCPU_SECTION(64)
 
-	. = ALIGN(PAGE_SIZE);
-	__init_end = .;
-
 	. = ALIGN(4);
 	.altinstructions : {
 		__alt_instructions = .;
@@ -142,6 +139,8 @@ SECTIONS
 	}
 
 	. = ALIGN(PAGE_SIZE);
+	__init_end = .;
+
 	_data = .;
 	_sdata = .;
 	RW_DATA_SECTION(64, PAGE_SIZE, THREAD_SIZE)
