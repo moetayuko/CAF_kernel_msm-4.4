@@ -17,6 +17,9 @@
  *      as published by the Free Software Foundation; either version
  *      2 of the License, or (at your option) any later version.
  */
+
+#define pr_fmt(fmt)	"OF: " fmt
+
 #include <linux/console.h>
 #include <linux/ctype.h>
 #include <linux/cpu.h>
@@ -127,7 +130,7 @@ static const char *safe_name(struct kobject *kobj, const char *orig_name)
 	}
 
 	if (name != orig_name)
-		pr_warn("device-tree: Duplicate name in %s, renamed to \"%s\"\n",
+		pr_warn("Duplicate name in %s, renamed to \"%s\"\n",
 			kobject_name(kobj), name);
 	return name;
 }
@@ -198,7 +201,7 @@ void __init of_core_init(void)
 	of_kset = kset_create_and_add("devicetree", NULL, firmware_kobj);
 	if (!of_kset) {
 		mutex_unlock(&of_mutex);
-		pr_err("devicetree: failed to register existing nodes\n");
+		pr_err("failed to register existing nodes\n");
 		return;
 	}
 	for_each_of_allnodes(np)
@@ -2257,8 +2260,8 @@ struct device_node *of_graph_get_next_endpoint(const struct device_node *parent,
 		of_node_put(node);
 
 		if (!port) {
-			pr_err("%s(): no port node found in %s\n",
-			       __func__, parent->full_name);
+			pr_err("graph: no port node found in %s\n",
+			       parent->full_name);
 			return NULL;
 		}
 	} else {
