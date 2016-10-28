@@ -276,7 +276,11 @@ void tty_port_tty_wakeup(struct tty_port *port)
 	struct tty_struct *tty = tty_port_tty_get(port);
 
 	if (tty) {
-		tty_wakeup(tty);
+		if (test_bit(TTY_DO_WRITE_WAKEUP, &tty->flags) &&
+		    port->client_ops)
+			port->client_ops->write_wakeup(port);
+		else
+			tty_wakeup(tty);
 		tty_kref_put(tty);
 	}
 }

@@ -221,6 +221,7 @@ struct tty_port_operations {
 
 struct tty_port_client_operations {
 	int (*receive_buf)(struct tty_port *port, const unsigned char *, const unsigned char *, size_t);
+	void (*write_wakeup)(struct tty_port *port);
 };
 
 struct tty_port {
@@ -247,6 +248,7 @@ struct tty_port {
 						   based drain is needed else
 						   set to size of fifo */
 	struct kref		kref;		/* Ref counter */
+	void 			*client_data;
 };
 
 /* tty_port::iflags bits -- use atomic bit ops */
