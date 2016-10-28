@@ -1,0 +1,34 @@
+Serial Slave Device DT binding
+
+This documents the binding structure and common properties for serial
+attached devices. Common examples include Bluetooth, WiFi, NFC and GPS
+devices.
+
+qSerial attached devices shall be a child node of the host UART device the
+slave device is attached to. It is expected that the attached device is
+the only child node of the UART device. The slave device node name shall
+reflect the generic type of device for the node.
+
+Required Properties:
+
+- compatible 	: A string reflecting the vendor and specific device the node
+		  represents.
+
+Optional Properties:
+
+- reg		: A single cell representing the port/line number of the
+		  host UART. Only used if the host UART is a single node
+		  with multiple ports.
+
+Example:
+
+serial@1234 {
+	compatible = "ns16550a";
+	interrupts = <1>;
+
+	bluetooth {
+		compatible = "brcm,bcm43341-bt";
+		interrupt-parent = <&gpio>;
+		interrupts = <10>;
+	};
+};
