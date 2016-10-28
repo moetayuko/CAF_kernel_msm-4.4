@@ -448,6 +448,18 @@ receive_buf(struct tty_ldisc *ld, struct tty_buffer *head, int count)
 	return tty_ldisc_receive_buf(ld, p, f, count);
 }
 
+static int
+tty_port_receive_buf(struct tty_port *port, struct tty_buffer *head, int count)
+{
+	unsigned char *p = char_buf_ptr(head, head->read);
+	char	      *f = NULL;
+
+	if (~head->flags & TTYB_NORMAL)
+		f = flag_buf_ptr(head, head->read);
+
+	return port->client_ops->receive_buf(port, p, f, count);
+}
+
 /**
  *	flush_to_ldisc
  *	@work: tty structure passed from work queue.
@@ -504,7 +516,11 @@ static void flush_to_ldisc(struct work_struct *work)
 			continue;
 		}
 
-		count = receive_buf(disc, head, count);
+		if (port->client_ops)
+			count = tty_port_receive_buf(port, head, count);
+		else
+			count = receive_buf(disc, head, count);
+
 		if (!count)
 			break;
 		head->read += count;
