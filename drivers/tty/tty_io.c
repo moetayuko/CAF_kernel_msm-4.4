@@ -1571,6 +1571,7 @@ err_release_tty:
 	release_tty(tty, idx);
 	return ERR_PTR(retval);
 }
+EXPORT_SYMBOL(tty_init_dev);
 
 static void tty_free_termios(struct tty_struct *tty)
 {
