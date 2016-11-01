@@ -22,7 +22,7 @@
  *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  */
-
+#define DEBUG
 #include <linux/module.h>
 
 #include <linux/kernel.h>
@@ -34,7 +34,9 @@
 #include <linux/poll.h>
 
 #include <linux/slab.h>
-#include <linux/tty.h>
+#include <linux/serdev.h>
+#include <linux/of.h>
+#include <linux/of_device.h>
 #include <linux/errno.h>
 #include <linux/string.h>
 #include <linux/signal.h>
@@ -138,7 +140,7 @@ int hci_uart_tx_wakeup(struct hci_uart *hu)
 static void hci_uart_write_work(struct work_struct *work)
 {
 	struct hci_uart *hu = container_of(work, struct hci_uart, write_work);
-	struct tty_struct *tty = hu->tty;
+	struct serdev_device *serdev = hu->serdev;
 	struct hci_dev *hdev = hu->hdev;
 	struct sk_buff *skb;
 
@@ -152,8 +154,7 @@ restart:
 	while ((skb = hci_uart_dequeue(hu))) {
 		int len;
 
-		set_bit(TTY_DO_WRITE_WAKEUP, &tty->flags);
-		len = tty->ops->write(tty, skb->data, skb->len);
+		len = serdev_device_write_buf(serdev, skb->data, skb->len);
 		hdev->stat.byte_tx += len;
 
 		skb_pull(skb, len);
@@ -215,17 +216,15 @@ static int hci_uart_open(struct hci_dev *hdev)
 static int hci_uart_flush(struct hci_dev *hdev)
 {
 	struct hci_uart *hu  = hci_get_drvdata(hdev);
-	struct tty_struct *tty = hu->tty;
 
-	BT_DBG("hdev %p tty %p", hdev, tty);
+	BT_DBG("hdev %p serdev %p", hdev, hu->serdev);
 
 	if (hu->tx_skb) {
 		kfree_skb(hu->tx_skb); hu->tx_skb = NULL;
 	}
 
 	/* Flush any pending characters in the driver and discipline. */
-	tty_ldisc_flush(tty);
-	tty_driver_flush_buffer(tty);
+	serdev_device_write_flush(hu->serdev);
 
 	if (test_bit(HCI_UART_PROTO_READY, &hu->flags))
 		hu->proto->flush(hu);
@@ -261,54 +260,7 @@ static int hci_uart_send_frame(struct hci_dev *hdev, struct sk_buff *skb)
 /* Flow control or un-flow control the device */
 void hci_uart_set_flow_control(struct hci_uart *hu, bool enable)
 {
-	struct tty_struct *tty = hu->tty;
-	struct ktermios ktermios;
-	int status;
-	unsigned int set = 0;
-	unsigned int clear = 0;
-
-	if (enable) {
-		/* Disable hardware flow control */
-		ktermios = tty->termios;
-		ktermios.c_cflag &= ~CRTSCTS;
-		status = tty_set_termios(tty, &ktermios);
-		BT_DBG("Disabling hardware flow control: %s",
-		       status ? "failed" : "success");
-
-		/* Clear RTS to prevent the device from sending */
-		/* Most UARTs need OUT2 to enable interrupts */
-		status = tty->driver->ops->tiocmget(tty);
-		BT_DBG("Current tiocm 0x%x", status);
-
-		set &= ~(TIOCM_OUT2 | TIOCM_RTS);
-		clear = ~set;
-		set &= TIOCM_DTR | TIOCM_RTS | TIOCM_OUT1 |
-		       TIOCM_OUT2 | TIOCM_LOOP;
-		clear &= TIOCM_DTR | TIOCM_RTS | TIOCM_OUT1 |
-			 TIOCM_OUT2 | TIOCM_LOOP;
-		status = tty->driver->ops->tiocmset(tty, set, clear);
-		BT_DBG("Clearing RTS: %s", status ? "failed" : "success");
-	} else {
-		/* Set RTS to allow the device to send again */
-		status = tty->driver->ops->tiocmget(tty);
-		BT_DBG("Current tiocm 0x%x", status);
-
-		set |= (TIOCM_OUT2 | TIOCM_RTS);
-		clear = ~set;
-		set &= TIOCM_DTR | TIOCM_RTS | TIOCM_OUT1 |
-		       TIOCM_OUT2 | TIOCM_LOOP;
-		clear &= TIOCM_DTR | TIOCM_RTS | TIOCM_OUT1 |
-			 TIOCM_OUT2 | TIOCM_LOOP;
-		status = tty->driver->ops->tiocmset(tty, set, clear);
-		BT_DBG("Setting RTS: %s", status ? "failed" : "success");
-
-		/* Re-enable hardware flow control */
-		ktermios = tty->termios;
-		ktermios.c_cflag |= CRTSCTS;
-		status = tty_set_termios(tty, &ktermios);
-		BT_DBG("Enabling hardware flow control: %s",
-		       status ? "failed" : "success");
-	}
+	serdev_device_set_flow_control(hu->serdev, enable);
 }
 
 void hci_uart_set_speeds(struct hci_uart *hu, unsigned int init_speed,
@@ -317,7 +269,7 @@ void hci_uart_set_speeds(struct hci_uart *hu, unsigned int init_speed,
 	hu->init_speed = init_speed;
 	hu->oper_speed = oper_speed;
 }
-
+#if 0
 void hci_uart_init_tty(struct hci_uart *hu)
 {
 	struct tty_struct *tty = hu->tty;
@@ -336,21 +288,13 @@ void hci_uart_init_tty(struct hci_uart *hu)
 	/* tty_set_termios() return not checked as it is always 0 */
 	tty_set_termios(tty, &ktermios);
 }
-
+#endif
 void hci_uart_set_baudrate(struct hci_uart *hu, unsigned int speed)
 {
-	struct tty_struct *tty = hu->tty;
-	struct ktermios ktermios;
-
-	ktermios = tty->termios;
-	ktermios.c_cflag &= ~CBAUD;
-	tty_termios_encode_baud_rate(&ktermios, speed, speed);
-
-	/* tty_set_termios() return not checked as it is always 0 */
-	tty_set_termios(tty, &ktermios);
+	int out_speed = serdev_device_set_baudrate(hu->serdev, speed);
 
 	BT_DBG("%s: New tty speeds: %d/%d", hu->hdev->name,
-	       tty->termios.c_ispeed, tty->termios.c_ospeed);
+	       speed, out_speed);
 }
 
 static int hci_uart_setup(struct hci_dev *hdev)
@@ -428,83 +372,6 @@ done:
 	return 0;
 }
 
-/* ------ LDISC part ------ */
-/* hci_uart_tty_open
- *
- *     Called when line discipline changed to HCI_UART.
- *
- * Arguments:
- *     tty    pointer to tty info structure
- * Return Value:
- *     0 if success, otherwise error code
- */
-static int hci_uart_tty_open(struct tty_struct *tty)
-{
-	struct hci_uart *hu;
-
-	BT_DBG("tty %p", tty);
-
-	/* Error if the tty has no write op instead of leaving an exploitable
-	   hole */
-	if (tty->ops->write == NULL)
-		return -EOPNOTSUPP;
-
-	hu = kzalloc(sizeof(struct hci_uart), GFP_KERNEL);
-	if (!hu) {
-		BT_ERR("Can't allocate control structure");
-		return -ENFILE;
-	}
-
-	tty->disc_data = hu;
-	hu->tty = tty;
-	tty->receive_room = 65536;
-
-	INIT_WORK(&hu->init_ready, hci_uart_init_work);
-	INIT_WORK(&hu->write_work, hci_uart_write_work);
-
-	/* Flush any pending characters in the driver */
-	tty_driver_flush_buffer(tty);
-
-	return 0;
-}
-
-/* hci_uart_tty_close()
- *
- *    Called when the line discipline is changed to something
- *    else, the tty is closed, or the tty detects a hangup.
- */
-static void hci_uart_tty_close(struct tty_struct *tty)
-{
-	struct hci_uart *hu = tty->disc_data;
-	struct hci_dev *hdev;
-
-	BT_DBG("tty %p", tty);
-
-	/* Detach from the tty */
-	tty->disc_data = NULL;
-
-	if (!hu)
-		return;
-
-	hdev = hu->hdev;
-	if (hdev)
-		hci_uart_close(hdev);
-
-	cancel_work_sync(&hu->write_work);
-
-	if (test_and_clear_bit(HCI_UART_PROTO_READY, &hu->flags)) {
-		if (hdev) {
-			if (test_bit(HCI_UART_REGISTERED, &hu->flags))
-				hci_unregister_dev(hdev);
-			hci_free_dev(hdev);
-		}
-		hu->proto->close(hu);
-	}
-	clear_bit(HCI_UART_PROTO_SET, &hu->flags);
-
-	kfree(hu);
-}
-
 /* hci_uart_tty_wakeup()
  *
  *    Callback for transmit wakeup. Called when low level
@@ -513,18 +380,16 @@ static void hci_uart_tty_close(struct tty_struct *tty)
  * Arguments:        tty    pointer to associated tty instance data
  * Return Value:    None
  */
-static void hci_uart_tty_wakeup(struct tty_struct *tty)
+static void hci_uart_write_wakeup(struct serdev_device *serdev)
 {
-	struct hci_uart *hu = tty->disc_data;
+	struct hci_uart *hu = serdev_device_get_drvdata(serdev);
 
 	BT_DBG("");
 
 	if (!hu)
 		return;
 
-	clear_bit(TTY_DO_WRITE_WAKEUP, &tty->flags);
-
-	if (tty != hu->tty)
+	if (serdev != hu->serdev)
 		return;
 
 	if (test_bit(HCI_UART_PROTO_READY, &hu->flags))
@@ -543,16 +408,16 @@ static void hci_uart_tty_wakeup(struct tty_struct *tty)
  *
  * Return Value:    None
  */
-static void hci_uart_tty_receive(struct tty_struct *tty, const u8 *data,
-				 char *flags, int count)
+static int hci_uart_receive_buf(struct serdev_device *serdev, const u8 *data,
+				   size_t count)
 {
-	struct hci_uart *hu = tty->disc_data;
+	struct hci_uart *hu = serdev_device_get_drvdata(serdev);
 
-	if (!hu || tty != hu->tty)
-		return;
+	if (!hu || serdev != hu->serdev)
+		return 0;
 
 	if (!test_bit(HCI_UART_PROTO_READY, &hu->flags))
-		return;
+		return 0;
 
 	/* It does not need a lock here as it is already protected by a mutex in
 	 * tty caller
@@ -562,8 +427,14 @@ static void hci_uart_tty_receive(struct tty_struct *tty, const u8 *data,
 	if (hu->hdev)
 		hu->hdev->stat.byte_rx += count;
 
-	tty_unthrottle(tty);
+	return count;
 }
+
+struct serdev_device_ops hci_serdev_client_ops = {
+	.receive_buf = hci_uart_receive_buf,
+	.write_wakeup = hci_uart_write_wakeup,
+};
+
 
 static int hci_uart_register_dev(struct hci_uart *hu)
 {
@@ -595,7 +466,7 @@ static int hci_uart_register_dev(struct hci_uart *hu)
 	hdev->flush = hci_uart_flush;
 	hdev->send  = hci_uart_send_frame;
 	hdev->setup = hci_uart_setup;
-	SET_HCIDEV_DEV(hdev, hu->tty->dev);
+	SET_HCIDEV_DEV(hdev, &hu->serdev->dev);
 
 	if (test_bit(HCI_UART_RAW_DEVICE, &hu->hdev_flags))
 		set_bit(HCI_QUIRK_RAW_DEVICE, &hdev->quirks);
@@ -650,6 +521,7 @@ static int hci_uart_set_proto(struct hci_uart *hu, int id)
 
 	return 0;
 }
+#if 0
 
 static int hci_uart_set_flags(struct hci_uart *hu, unsigned long flags)
 {
@@ -735,56 +607,90 @@ static int hci_uart_tty_ioctl(struct tty_struct *tty, struct file *file,
 
 	return err;
 }
+#endif
 
-/*
- * We don't provide read/write/poll interface for user space.
- */
-static ssize_t hci_uart_tty_read(struct tty_struct *tty, struct file *file,
-				 unsigned char __user *buf, size_t nr)
+static int hci_uart_probe(struct serdev_device *serdev)
 {
-	return 0;
-}
-
-static ssize_t hci_uart_tty_write(struct tty_struct *tty, struct file *file,
-				  const unsigned char *data, size_t count)
-{
-	return 0;
-}
-
-static unsigned int hci_uart_tty_poll(struct tty_struct *tty,
-				      struct file *filp, poll_table *wait)
-{
-	return 0;
-}
-
-static int __init hci_uart_init(void)
-{
-	static struct tty_ldisc_ops hci_uart_ldisc;
-	int err;
+	int id, ret;
+	struct hci_uart *hu;
 
 	BT_INFO("HCI UART driver ver %s", VERSION);
 
-	/* Register the tty discipline */
+	id = (int)of_device_get_match_data(&serdev->dev);
 
-	memset(&hci_uart_ldisc, 0, sizeof(hci_uart_ldisc));
-	hci_uart_ldisc.magic		= TTY_LDISC_MAGIC;
-	hci_uart_ldisc.name		= "n_hci";
-	hci_uart_ldisc.open		= hci_uart_tty_open;
-	hci_uart_ldisc.close		= hci_uart_tty_close;
-	hci_uart_ldisc.read		= hci_uart_tty_read;
-	hci_uart_ldisc.write		= hci_uart_tty_write;
-	hci_uart_ldisc.ioctl		= hci_uart_tty_ioctl;
-	hci_uart_ldisc.poll		= hci_uart_tty_poll;
-	hci_uart_ldisc.receive_buf	= hci_uart_tty_receive;
-	hci_uart_ldisc.write_wakeup	= hci_uart_tty_wakeup;
-	hci_uart_ldisc.owner		= THIS_MODULE;
+	hu = devm_kzalloc(&serdev->dev, sizeof(struct hci_uart), GFP_KERNEL);
+	if (!hu)
+		return -ENFILE;
 
-	err = tty_register_ldisc(N_HCI, &hci_uart_ldisc);
-	if (err) {
-		BT_ERR("HCI line discipline registration failed. (%d)", err);
-		return err;
+	serdev_device_set_drvdata(serdev, hu);
+	hu->serdev = serdev;
+
+	INIT_WORK(&hu->init_ready, hci_uart_init_work);
+	INIT_WORK(&hu->write_work, hci_uart_write_work);
+
+	serdev_device_set_client_ops(serdev, &hci_serdev_client_ops);
+
+	ret = serdev_device_open(serdev);
+	if (ret)
+		return ret;
+
+	set_bit(HCI_UART_PROTO_SET, &hu->flags);
+	ret = hci_uart_set_proto(hu, id);
+	if (ret) {
+		serdev_device_close(serdev);
+		return ret;
 	}
 
+	/* Flush any pending characters in the driver */
+//	tty_driver_flush_buffer(tty);
+
+
+	return 0;
+}
+
+static void hci_uart_remove(struct serdev_device *serdev)
+{
+	struct hci_dev *hdev;
+	struct hci_uart *hu = serdev_device_get_drvdata(serdev);
+
+	hdev = hu->hdev;
+	if (hdev)
+		hci_uart_close(hdev);
+
+	cancel_work_sync(&hu->write_work);
+
+	if (test_and_clear_bit(HCI_UART_PROTO_READY, &hu->flags)) {
+		if (hdev) {
+			if (test_bit(HCI_UART_REGISTERED, &hu->flags))
+				hci_unregister_dev(hdev);
+			hci_free_dev(hdev);
+		}
+		hu->proto->close(hu);
+	}
+	clear_bit(HCI_UART_PROTO_SET, &hu->flags);
+
+	pr_info("hci_uart disconnect!!!\n");
+	serdev_device_close(serdev);
+}
+
+
+static const struct of_device_id hci_uart_of_match[] = {
+	{ .compatible = "loopback-uart", .data = (void *)HCI_UART_BCM },
+	{},
+};
+MODULE_DEVICE_TABLE(of, hci_uart_of_match);
+
+static struct serdev_device_driver hci_uart_drv = {
+	.driver		= {
+		.name	= "hci-uart",
+		.of_match_table = of_match_ptr(hci_uart_of_match),
+	},
+	.probe	= hci_uart_probe,
+	.remove	= hci_uart_remove,
+};
+
+static int __init hci_uart_init(void)
+{
 #ifdef CONFIG_BT_HCIUART_H4
 	h4_init();
 #endif
@@ -816,13 +722,11 @@ static int __init hci_uart_init(void)
 	mrvl_init();
 #endif
 
-	return 0;
+	return serdev_device_driver_register(&hci_uart_drv);
 }
 
 static void __exit hci_uart_exit(void)
 {
-	int err;
-
 #ifdef CONFIG_BT_HCIUART_H4
 	h4_deinit();
 #endif
@@ -853,11 +757,7 @@ static void __exit hci_uart_exit(void)
 #ifdef CONFIG_BT_HCIUART_MRVL
 	mrvl_deinit();
 #endif
-
-	/* Release tty registration of line discipline */
-	err = tty_unregister_ldisc(N_HCI);
-	if (err)
-		BT_ERR("Can't unregister HCI line discipline (%d)", err);
+	serdev_device_driver_unregister(&hci_uart_drv);
 }
 
 module_init(hci_uart_init);
@@ -867,4 +767,3 @@ MODULE_AUTHOR("Marcel Holtmann <marcel@holtmann.org>");
 MODULE_DESCRIPTION("Bluetooth HCI UART driver ver " VERSION);
 MODULE_VERSION(VERSION);
 MODULE_LICENSE("GPL");
-MODULE_ALIAS_LDISC(N_HCI);
