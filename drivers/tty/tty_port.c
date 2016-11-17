@@ -16,6 +16,7 @@
 #include <linux/bitops.h>
 #include <linux/delay.h>
 #include <linux/module.h>
+#include <linux/serdev.h>
 
 void tty_port_init(struct tty_port *port)
 {
@@ -89,9 +90,17 @@ struct device *tty_port_register_device_attr(struct tty_port *port,
 		struct device *device, void *drvdata,
 		const struct attribute_group **attr_grp)
 {
+	struct device *ttydev;
+
 	tty_port_link_device(port, driver, index);
-	return tty_register_device_attr(driver, index, device, drvdata,
+	ttydev = tty_register_device_attr(driver, index, device, drvdata,
 			attr_grp);
+	if (!ttydev)
+		return NULL;
+
+	serdev_tty_port_register(port, device, driver, index);
+	return ttydev;
+
 }
 EXPORT_SYMBOL_GPL(tty_port_register_device_attr);
 
@@ -141,6 +150,9 @@ static void tty_port_destructor(struct kref *kref)
 	/* check if last port ref was dropped before tty release */
 	if (WARN_ON(port->itty))
 		return;
+
+	serdev_tty_port_unregister(port);
+
 	if (port->xmit_buf)
 		free_page((unsigned long)port->xmit_buf);
 	tty_port_destroy(port);

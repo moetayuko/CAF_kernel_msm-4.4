@@ -190,4 +190,21 @@ void serdev_device_set_flow_control(struct serdev_device *serdev, bool enable);
 int serdev_device_write_buf(struct serdev_device *serdev, u8 *buf, size_t count);
 void serdev_device_write_flush(struct serdev_device *serdev);
 
+struct tty_port;
+struct tty_driver;
+
+#ifdef CONFIG_SERIAL_DEV_CTRL_TTYPORT
+int serdev_tty_port_register(struct tty_port *port, struct device *parent,
+			    struct tty_driver *drv, int idx);
+void serdev_tty_port_unregister(struct tty_port *port);
+#else
+static inline int serdev_tty_port_register(struct tty_port *port,
+					   struct device *parent,
+					   struct tty_driver *drv, int idx)
+{
+	return -ENODEV;
+}
+static inline void serdev_tty_port_unregister(struct tty_port *port) {}
+#endif
+
 #endif
