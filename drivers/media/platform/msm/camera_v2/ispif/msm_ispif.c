@@ -176,6 +176,16 @@ static int msm_ispif_config2(struct ispif_device *ispif,
 	}
 
 	for (i = 0; i < params->num; i++) {
+		int j;
+
+		if (params->entries[i].num_cids > MAX_CID_CH_PARAM_ENTRY)
+			return -EINVAL;
+		for (j = 0; j < params->entries[i].num_cids; j++)
+			if (params->entries[i].cids[j] >= CID_MAX)
+				return -EINVAL;
+	}
+
+	for (i = 0; i < params->num; i++) {
 		intftype = params->entries[i].intftype;
 		vfe_intf = params->entries[i].vfe_intf;
 
