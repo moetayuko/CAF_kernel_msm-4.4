@@ -11,6 +11,7 @@
  */
 
 #include "msmfalcon-pinctrl.dtsi"
+#include "msmfalcon-camera-sensor-cdp.dtsi"
 / {
 };
 
@@ -42,4 +43,7 @@
 };
 
 &soc {
+	qcom,msm-ssc-sensors {
+		compatible = "qcom,msm-ssc-sensors";
+	};
 };
