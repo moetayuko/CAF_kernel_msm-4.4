@@ -934,8 +934,6 @@ err_create_pkt:
 	return rc;
 }
 
-static DECLARE_COMPLETION(release_resources_done);
-
 static int __alloc_imem(struct venus_hfi_device *device, unsigned long size)
 {
 	struct imem *imem = NULL;
@@ -2171,8 +2169,6 @@ static int venus_hfi_core_init(void *device)
 
 	dev = device;
 	mutex_lock(&dev->lock);
-
-	init_completion(&release_resources_done);
 
 	rc = __load_fw(dev);
 	if (rc) {
@@ -3460,7 +3456,6 @@ static int __response_handler(struct venus_hfi_device *device)
 			break;
 		case HAL_SYS_RELEASE_RESOURCE_DONE:
 			dprintk(VIDC_DBG, "Received SYS_RELEASE_RESOURCE\n");
-			complete(&release_resources_done);
 			break;
 		case HAL_SYS_INIT_DONE:
 			dprintk(VIDC_DBG, "Received SYS_INIT_DONE\n");
@@ -4423,6 +4418,7 @@ static void __unload_fw(struct venus_hfi_device *device)
 	if (device->state != VENUS_STATE_DEINIT)
 		flush_workqueue(device->venus_pm_workq);
 
+	__vote_buses(device, NULL, 0);
 	subsystem_put(device->resources.fw.cookie);
 	__interface_queues_release(device);
 	__venus_power_off(device, false);

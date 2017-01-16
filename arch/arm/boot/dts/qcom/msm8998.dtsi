@@ -1487,10 +1487,11 @@
 	spss_utils: qcom,spss_utils {
 		compatible = "qcom,spss-utils";
 		/* spss test fuse physical address */
-		qcom,spss-fuse-addr = <0x007841c4 0x4>;
+		qcom,spss-fuse-addr = <0x007841c4>;
 		qcom,spss-fuse-bit = <27>;
 		qcom,spss-test-firmware-name = "spss";    /* default name */
 		qcom,spss-prod-firmware-name = "spss1p";  /* 8 chars max */
+		qcom,spss-debug-reg-addr = <0x01d06020>;
 		status = "ok";
 	};
 
@@ -2037,10 +2038,9 @@
 		clock-names = "xo", "iface_clk", "bus_clk",
 			      "mem_clk", "gpll0_mss_clk", "snoc_axi_clk",
 			      "mnoc_axi_clk", "qdss_clk";
-		qcom,proxy-clock-names = "xo", "qdss_clk";
-		qcom,active-clock-names = "iface_clk", "bus_clk", "mem_clk",
-					  "gpll0_mss_clk", "snoc_axi_clk",
-					  "mnoc_axi_clk";
+		qcom,proxy-clock-names = "xo", "qdss_clk", "mem_clk";
+		qcom,active-clock-names = "iface_clk", "bus_clk",
+			"gpll0_mss_clk", "snoc_axi_clk", "mnoc_axi_clk";
 
 		interrupts = <0 448 1>;
 		vdd_cx-supply = <&pm8998_s1_level>;
@@ -2051,7 +2051,6 @@
 		qcom,pil-self-auth;
 		qcom,sysmon-id = <0>;
 		qcom,ssctl-instance-id = <0x12>;
-		qcom,override-acc;
 		qcom,qdsp6v62-1-2;
 		status = "ok";
 		memory-region = <&modem_mem>;
@@ -2250,6 +2249,7 @@
 		qcom,support-fde;
 		qcom,no-clock-support;
 		qcom,appsbl-qseecom-support;
+		qcom,fde-key-size;
 		qcom,commonlib64-loaded-by-uefi;
 		qcom,msm-bus,name = "qseecom-noc";
 		qcom,msm-bus,num-cases = <4>;
@@ -2826,6 +2826,11 @@
 			reg = <0x6b0 32>;
 		};
 
+		kaslr_offset@6d0 {
+			compatible = "qcom,msm-imem-kaslr_offset";
+			reg = <0x6d0 12>;
+		};
+
 		pil@94c {
 			compatible = "qcom,msm-imem-pil";
 			reg = <0x94c 200>;
@@ -2971,13 +2976,9 @@
 	 qcom,icnss@18800000 {
 		compatible = "qcom,icnss";
 		reg = <0x18800000 0x800000>,
-		      <0x10AC000 0x20>,
 		      <0xa0000000 0x10000000>,
 		      <0xb0000000 0x10000>;
-		reg-names = "membase", "mpm_config",
-			    "smmu_iova_base", "smmu_iova_ipa";
-		clocks = <&clock_gcc clk_rf_clk2_pin>;
-		clock-names = "cxo_ref_clk_pin";
+		reg-names = "membase", "smmu_iova_base", "smmu_iova_ipa";
 		iommus = <&anoc2_smmu 0x1900>,
 			 <&anoc2_smmu 0x1901>;
 		interrupts = <0 413 0 /* CE0 */ >,
@@ -2993,12 +2994,6 @@
 			     <0 424 0 /* CE10 */ >,
 			     <0 425 0 /* CE11 */ >;
 		qcom,wlan-msa-memory = <0x100000>;
-		vdd-0.8-cx-mx-supply = <&pm8998_l5>;
-		vdd-1.8-xo-supply = <&pm8998_l7_pin_ctrl>;
-		vdd-1.3-rfa-supply = <&pm8998_l17_pin_ctrl>;
-		vdd-3.3-ch0-supply = <&pm8998_l25_pin_ctrl>;
-		qcom,vdd-0.8-cx-mx-config = <800000 800000>;
-		qcom,vdd-3.3-ch0-config = <3104000 3312000>;
 		qcom,icnss-vadc = <&pm8998_vadc>;
 		qcom,icnss-adc_tm = <&pm8998_adc_tm>;
 	};
@@ -3158,6 +3153,7 @@
 
 &gdsc_cpp {
 	parent-supply = <&gdsc_camss_top>;
+	qcom,support-hw-trigger;
 	status = "ok";
 };
 

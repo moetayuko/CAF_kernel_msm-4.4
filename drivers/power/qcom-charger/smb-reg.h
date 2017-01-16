@@ -1,4 +1,4 @@
-/* Copyright (c) 2016 The Linux Foundation. All rights reserved.
+/* Copyright (c) 2016-2017 The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -494,9 +494,9 @@ enum {
 
 #define TYPE_C_STATUS_3_REG			(USBIN_BASE + 0x0D)
 #define ENABLE_BANDGAP_BIT			BIT(7)
-#define U_USB_GROUND_NOVBUS_BIT			BIT(6)
+#define U_USB_GND_NOVBUS_BIT			BIT(6)
 #define U_USB_FLOAT_NOVBUS_BIT			BIT(5)
-#define U_USB_GROUND_BIT			BIT(4)
+#define U_USB_GND_BIT				BIT(4)
 #define U_USB_FMB1_BIT				BIT(3)
 #define U_USB_FLOAT1_BIT			BIT(2)
 #define U_USB_FMB2_BIT				BIT(1)
@@ -860,6 +860,10 @@ enum {
 #define WDOG_STATUS_1_BIT			BIT(1)
 #define BARK_BITE_STATUS_BIT			BIT(0)
 
+#define SYSOK_REASON_STATUS_REG			(MISC_BASE + 0x0D)
+#define SYSOK_REASON_DCIN_BIT			BIT(1)
+#define SYSOK_REASON_USBIN_BIT			BIT(0)
+
 /* MISC Interrupt Bits */
 #define SWITCHER_POWER_OK_RT_STS_BIT		BIT(7)
 #define TEMPERATURE_CHANGE_RT_STS_BIT		BIT(6)
@@ -897,7 +901,7 @@ enum {
 #define BITE_WDOG_INT_EN_BIT			BIT(5)
 #define SFT_AFTER_WDOG_IRQ_MASK			GENMASK(4, 3)
 #define WDOG_IRQ_SFT_BIT			BIT(2)
-#define WDOG_OPTION_BIT				BIT(1)
+#define WDOG_TIMER_EN_ON_PLUGIN_BIT		BIT(1)
 #define WDOG_TIMER_EN_BIT			BIT(0)
 
 #define MISC_CFG_REG				(MISC_BASE + 0x52)
@@ -1000,5 +1004,6 @@ enum {
 #define SYSOK_OPTIONS_MASK			GENMASK(2, 0)
 
 #define CFG_BUCKBOOST_FREQ_SELECT_BUCK_REG	(MISC_BASE + 0xA0)
+#define CFG_BUCKBOOST_FREQ_SELECT_BOOST_REG	(MISC_BASE + 0xA1)
 
 #endif /* __SMB2_CHARGER_REG_H */

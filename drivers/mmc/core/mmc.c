@@ -1192,10 +1192,6 @@ static int mmc_select_hs400(struct mmc_card *card)
 	if (host->caps & MMC_CAP_WAIT_WHILE_BUSY)
 		send_status = false;
 
-	/* Reduce frequency to HS frequency */
-	max_dtr = card->ext_csd.hs_max_dtr;
-	mmc_set_clock(host, max_dtr);
-
 	/* Switch card to HS mode */
 	val = EXT_CSD_TIMING_HS;
 	err = __mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
@@ -1210,6 +1206,10 @@ static int mmc_select_hs400(struct mmc_card *card)
 
 	/* Set host controller to HS timing */
 	mmc_set_timing(card->host, MMC_TIMING_MMC_HS);
+
+	/* Reduce frequency to HS frequency */
+	max_dtr = card->ext_csd.hs_max_dtr;
+	mmc_set_clock(host, max_dtr);
 
 	if (!send_status) {
 		err = mmc_switch_status(card);
@@ -2514,12 +2514,6 @@ static int _mmc_suspend(struct mmc_host *host, bool is_suspend)
 			goto out;
 	}
 
-	if (mmc_card_doing_auto_bkops(host->card)) {
-		err = mmc_set_auto_bkops(host->card, false);
-		if (err)
-			goto out;
-	}
-
 	err = mmc_flush_cache(host->card);
 	if (err)
 		goto out;
@@ -2598,9 +2592,6 @@ static int mmc_partial_init(struct mmc_host *host)
 	}
 	pr_debug("%s: %s: reading and comparing ext_csd successful\n",
 		mmc_hostname(host), __func__);
-
-	if (mmc_card_support_auto_bkops(host->card))
-		(void)mmc_set_auto_bkops(host->card, true);
 
 	if (card->ext_csd.cmdq_support && (card->host->caps2 &
 					   MMC_CAP2_CMD_QUEUE)) {
