@@ -1,4 +1,4 @@
-/* Copyright (c) 2016, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2016-2017, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -13,7 +13,6 @@
 #include <dt-bindings/interrupt-controller/irq.h>
 #include "msm8998-pinctrl.dtsi"
 #include "msm8998-audio.dtsi"
-#include "msm8998-camera-sensor-skuk.dtsi"
 
 / {
 	bluetooth: bt_wcn3990 {
@@ -160,6 +159,15 @@
 		input-name = "gpio-keys";
 		status = "okay";
 
+		home {
+			label = "home";
+			gpios = <&pm8998_gpios 5 0x1>;
+			linux,input-type = <1>;
+			linux,code = <102>;
+			gpio-key,wakeup;
+			debounce-interval = <15>;
+		};
+
 		vol_up {
 			label = "volume_up";
 			gpios = <&pm8998_gpios 6 0x1>;
@@ -203,11 +211,11 @@
 		vcc_ana-supply = <&pm8998_l28>;
 		vcc_dig-supply = <&pm8998_l6>;
 		qcom,afe-load = <20000>;
-		qcom,afe-vtg-min = <2850000>;
-		qcom,afe-vtg-max = <3000000>;
+		qcom,afe-vtg-min = <3008000>;
+		qcom,afe-vtg-max = <3008000>;
 		qcom,dig-load = <40000>;
-		qcom,dig-vtg-min = <1800000>;
-		qcom,dig-vtg-max = <1800000>;
+		qcom,dig-vtg-min = <1808000>;
+		qcom,dig-vtg-max = <1808000>;
 		qcom,fb-resume-delay-us = <10000>;
 		qcom,afe-power-on-delay-us = <1000>;
 		qcom,afe-power-off-delay-us = <6>;
@@ -290,10 +298,16 @@
 
 &pmi8998_fg {
 	qcom,battery-data = <&qrd_batterydata>;
+	qcom,fg-jeita-thresholds = <0 5 55 55>;
 };
 
 &pmi8998_haptics {
 	status = "okay";
+};
+
+&pmi8998_wled {
+	qcom,led-strings-list = [00 01];
+	qcom,fs-curr-ua = <20000>;
 };
 
 &tlmm {
@@ -433,12 +447,43 @@
 
 &red_led {
 	/delete-property/ linux,default-trigger;
+	qcom,start-idx = <1>;
+	qcom,idx-len = <10>;
+	qcom,duty-pcts = [00 19 32 4b 64
+			64 4b 32 19 00];
+	qcom,lut-flags = <3>;
+	qcom,pause-lo = <0>;
+	qcom,pause-hi = <0>;
+	qcom,ramp-step-ms = <255>;
+	qcom,use-blink;
 };
 
 &green_led {
 	/delete-property/ linux,default-trigger;
+	qcom,start-idx = <1>;
+	qcom,idx-len = <10>;
+	qcom,duty-pcts = [00 19 32 4b 64
+			64 4b 32 19 00];
+	qcom,lut-flags = <3>;
+	qcom,pause-lo = <0>;
+	qcom,pause-hi = <0>;
+	qcom,ramp-step-ms = <255>;
+	qcom,use-blink;
 };
 
 &blue_led {
 	/delete-property/ linux,default-trigger;
+	qcom,start-idx = <1>;
+	qcom,idx-len = <10>;
+	qcom,duty-pcts = [00 19 32 4b 64
+			64 4b 32 19 00];
+	qcom,lut-flags = <3>;
+	qcom,pause-lo = <0>;
+	qcom,pause-hi = <0>;
+	qcom,ramp-step-ms = <255>;
+	qcom,use-blink;
+};
+
+&wil6210 {
+	status = "ok";
 };

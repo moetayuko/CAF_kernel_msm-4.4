@@ -6,7 +6,7 @@
  * Copyright (C) 2008 Nokia Corporation
  * Copyright (C) 2009 Samsung Electronics
  *			Author: Michal Nazarewicz (mina86@mina86.com)
- * Copyright (c) 2012-2016, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2017, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2
@@ -683,6 +683,7 @@ static int rndis_qc_set_alt(struct usb_function *f, unsigned intf, unsigned alt)
 
 	/* we know alt == 0 */
 
+	opts = container_of(f->fi, struct f_rndis_qc_opts, func_inst);
 	if (intf == rndis->ctrl_id) {
 		if (rndis->notify->driver_data) {
 			VDBG(cdev, "reset rndis control %d\n", intf);
@@ -1197,7 +1198,7 @@ usb_function *rndis_qc_bind_config_vendor(struct usb_function_instance *fi,
 	/* export host's Ethernet address in CDC format */
 	random_ether_addr(rndis_ipa_params.host_ethaddr);
 	random_ether_addr(rndis_ipa_params.device_ethaddr);
-	pr_debug("setting host_ethaddr=%pM, device_ethaddr=%pM\n",
+	pr_debug("setting host_ethaddr=%pKM, device_ethaddr=%pKM\n",
 		rndis_ipa_params.host_ethaddr,
 		rndis_ipa_params.device_ethaddr);
 	rndis_ipa_supported = true;
@@ -1347,19 +1348,16 @@ static struct miscdevice rndis_qc_device = {
 
 static void qcrndis_free_inst(struct usb_function_instance *f)
 {
-	struct f_rndis_qc	*rndis;
 	struct f_rndis_qc_opts	*opts = container_of(f,
 				struct f_rndis_qc_opts, func_inst);
 	unsigned long flags;
 
-	rndis = opts->rndis;
 	misc_deregister(&rndis_qc_device);
 
 	ipa_data_free(USB_IPA_FUNC_RNDIS);
 	spin_lock_irqsave(&rndis_lock, flags);
-	kfree(rndis);
-	_rndis_qc = NULL;
 	kfree(opts->rndis);
+	_rndis_qc = NULL;
 	kfree(opts);
 	spin_unlock_irqrestore(&rndis_lock, flags);
 }
@@ -1441,13 +1439,6 @@ static struct usb_function_instance *qcrndis_alloc_inst(void)
 	return &opts->func_inst;
 }
 
-static void rndis_qc_cleanup(void)
-{
-	pr_info("rndis QC cleanup\n");
-
-	misc_deregister(&rndis_qc_device);
-}
-
 void *rndis_qc_get_ipa_rx_cb(void)
 {
 	return rndis_ipa_params.ipa_rx_notify;
@@ -1485,7 +1476,6 @@ static int __init usb_qcrndis_init(void)
 static void __exit usb_qcrndis_exit(void)
 {
 	usb_function_unregister(&rndis_bamusb_func);
-	rndis_qc_cleanup();
 }
 
 module_init(usb_qcrndis_init);

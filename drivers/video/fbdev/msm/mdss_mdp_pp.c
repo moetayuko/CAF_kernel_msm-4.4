@@ -1123,7 +1123,8 @@ static int pp_vig_pipe_setup(struct mdss_mdp_pipe *pipe, u32 *op)
 	mdss_mdp_pp_get_dcm_state(pipe, &dcm_state);
 
 	mdata = mdss_mdp_get_mdata();
-	if (IS_MDSS_MAJOR_MINOR_SAME(mdata->mdp_rev, MDSS_MDP_HW_REV_301) ||
+	if (IS_MDSS_MAJOR_MINOR_SAME(mdata->mdp_rev, MDSS_MDP_HW_REV_320) ||
+	    IS_MDSS_MAJOR_MINOR_SAME(mdata->mdp_rev, MDSS_MDP_HW_REV_301) ||
 	    IS_MDSS_MAJOR_MINOR_SAME(mdata->mdp_rev, MDSS_MDP_HW_REV_300)) {
 		if (pipe->src_fmt->is_yuv) {
 			/* TODO: check csc cfg from PP block */
@@ -1654,10 +1655,6 @@ int mdss_mdp_scaler_lut_cfg(struct mdp_scale_data_v2 *scaler,
 		}
 	}
 
-	if (scaler->lut_flag & SCALER_LUT_SWAP)
-		writel_relaxed(BIT(0), MDSS_MDP_REG_SCALER_COEF_LUT_CTRL +
-				offset);
-
 	return 0;
 }
 
@@ -1794,6 +1791,10 @@ int mdss_mdp_qseed3_setup(struct mdp_scale_data_v2 *scaler,
 						__func__);
 				return -EINVAL;
 			}
+			if (scaler->lut_flag & SCALER_LUT_SWAP)
+				writel_relaxed(BIT(0),
+					MDSS_MDP_REG_SCALER_COEF_LUT_CTRL +
+					offset);
 		}
 
 		writel_relaxed(phase_init,
@@ -7664,6 +7665,7 @@ static int pp_get_driver_ops(struct mdp_pp_driver_ops *ops)
 		break;
 	case MDSS_MDP_HW_REV_300:
 	case MDSS_MDP_HW_REV_301:
+	case MDSS_MDP_HW_REV_320:
 		/*
 		 * Some of the REV_300 PP features are same as REV_107.
 		 * Get the driver ops for both the versions and update the
