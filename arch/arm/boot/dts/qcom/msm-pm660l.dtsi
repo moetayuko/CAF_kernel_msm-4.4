@@ -1,4 +1,4 @@
-/* Copyright (c) 2016, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2016-2017, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -37,7 +37,7 @@
 		qcom,temp-alarm@2400 {
 			compatible = "qcom,qpnp-temp-alarm";
 			reg = <0x2400 0x100>;
-			interrupts = <0x0 0x24 0x0 IRQ_TYPE_EDGE_RISING>;
+			interrupts = <0x2 0x24 0x0 IRQ_TYPE_EDGE_RISING>;
 			label = "pm660l_tz";
 		};
 
@@ -167,6 +167,17 @@
 			qcom,supported-sizes = <6>, <9>;
 			qcom,ramp-index = <2>;
 			#pwm-cells = <2>;
+			qcom,period = <6000000>;
+
+			qcom,lpg {
+				label = "lpg";
+				cell-index = <0>;
+				qcom,duty-percents =
+					<0x01 0x0a 0x14 0x1e 0x28 0x32 0x3c
+					0x46 0x50 0x5a 0x64
+					0x64 0x5a 0x50 0x46 0x3c 0x32 0x28 0x1e
+					0x14 0x0a 0x01>;
+			};
 		};
 
 		pm660l_pwm_4: pwm@b400 {
@@ -197,8 +208,12 @@
 				qcom,max-current = <12>;
 				qcom,default-state = "off";
 				linux,name = "red";
-				linux,default-trigger =
-					"battery-charging";
+				qcom,start-idx = <0>;
+				qcom,idx-len = <22>;
+				qcom,duty-pcts =
+					[01 0a 14 1e 28 32 3c 46 50 5a 64
+					64 5a 50 46 3c 32 28 1e 14 0a 01];
+				qcom,use-blink;
 			};
 
 			green_led: qcom,rgb_1 {
@@ -210,7 +225,6 @@
 				qcom,max-current = <12>;
 				qcom,default-state = "off";
 				linux,name = "green";
-				linux,default-trigger = "battery-full";
 			};
 
 			blue_led: qcom,rgb_2 {
@@ -222,7 +236,6 @@
 				qcom,max-current = <12>;
 				qcom,default-state = "off";
 				linux,name = "blue";
-				linux,default-trigger = "boot-indication";
 			};
 		};
 

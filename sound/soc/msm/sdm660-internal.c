@@ -1,4 +1,4 @@
-/* Copyright (c) 2015-2016, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2015-2017, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -181,9 +181,7 @@ static int msm_int_mi2s_snd_startup(struct snd_pcm_substream *substream);
 static void msm_int_mi2s_snd_shutdown(struct snd_pcm_substream *substream);
 
 static struct wcd_mbhc_config *mbhc_cfg_ptr;
-static struct snd_info_entry *msm_sdw_codec_root;
-static struct snd_info_entry *msm_dig_codec_root;
-static struct snd_info_entry *pmic_analog_codec_root;
+static struct snd_info_entry *codec_root;
 
 static int int_mi2s_get_bit_format_val(int bit_format)
 {
@@ -916,15 +914,6 @@ static const struct snd_kcontrol_new msm_snd_controls[] = {
 	SOC_ENUM_EXT("INT3_MI2S_TX SampleRate", int3_mi2s_tx_sample_rate,
 			int_mi2s_sample_rate_get,
 			int_mi2s_sample_rate_put),
-	SOC_ENUM_EXT("INT0_MI2S_RX SampleRate", int0_mi2s_rx_sample_rate,
-			int_mi2s_sample_rate_get,
-			int_mi2s_sample_rate_put),
-	SOC_ENUM_EXT("INT2_MI2S_TX SampleRate", int2_mi2s_tx_sample_rate,
-			int_mi2s_sample_rate_get,
-			int_mi2s_sample_rate_put),
-	SOC_ENUM_EXT("INT3_MI2S_TX SampleRate", int3_mi2s_tx_sample_rate,
-			int_mi2s_sample_rate_get,
-			int_mi2s_sample_rate_put),
 	SOC_ENUM_EXT("INT0_MI2S_RX Channels", int0_mi2s_rx_chs,
 			int_mi2s_ch_get, int_mi2s_ch_put),
 	SOC_ENUM_EXT("INT2_MI2S_TX Channels", int2_mi2s_tx_chs,
@@ -1295,13 +1284,24 @@ static int msm_audrx_init(struct snd_soc_pcm_runtime *rtd)
 	struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
 	struct snd_soc_pcm_runtime *rtd_aux = rtd->card->rtd_aux;
 	struct snd_card *card;
-	struct snd_info_entry *entry;
 	int ret = -ENOMEM;
 
 	pr_debug("%s(),dev_name%s\n", __func__, dev_name(cpu_dai->dev));
 
-	snd_soc_add_codec_controls(ana_cdc, msm_snd_controls,
+	ret = snd_soc_add_codec_controls(ana_cdc, msm_snd_controls,
 				   ARRAY_SIZE(msm_snd_controls));
+	if (ret < 0) {
+		pr_err("%s: add_codec_controls failed: %d\n",
+			__func__, ret);
+		return ret;
+	}
+	ret = snd_soc_add_codec_controls(ana_cdc, msm_common_snd_controls,
+				   msm_common_snd_controls_size());
+	if (ret < 0) {
+		pr_err("%s: add common snd controls failed: %d\n",
+			__func__, ret);
+		return ret;
+	}
 
 	snd_soc_dapm_new_controls(dapm, msm_int_dapm_widgets,
 				  ARRAY_SIZE(msm_int_dapm_widgets));
@@ -1349,26 +1349,16 @@ static int msm_audrx_init(struct snd_soc_pcm_runtime *rtd)
 		}
 	}
 	card = rtd->card->snd_card;
-	entry = snd_register_module_info(card->module, "codecs",
-					 card->proc_root);
-	if (!entry) {
+	if (!codec_root)
+		codec_root = snd_register_module_info(card->module, "codecs",
+						      card->proc_root);
+	if (!codec_root) {
 		pr_debug("%s: Cannot create codecs module entry\n",
 			 __func__);
-		msm_dig_codec_root = NULL;
 		goto done;
 	}
-	msm_dig_codec_root = entry;
-	msm_dig_codec_info_create_codec_entry(msm_dig_codec_root, dig_cdc);
-	entry = snd_register_module_info(card->module, "codecs",
-					 card->proc_root);
-	if (!entry) {
-		pr_debug("%s: Cannot create codecs module entry\n",
-			 __func__);
-		pmic_analog_codec_root = NULL;
-		goto done;
-	}
-	pmic_analog_codec_root = entry;
-	msm_anlg_codec_info_create_codec_entry(pmic_analog_codec_root, ana_cdc);
+	msm_dig_codec_info_create_codec_entry(codec_root, dig_cdc);
+	msm_anlg_codec_info_create_codec_entry(codec_root, ana_cdc);
 done:
 	return 0;
 }
@@ -1379,7 +1369,6 @@ static int msm_sdw_audrx_init(struct snd_soc_pcm_runtime *rtd)
 	struct snd_soc_dapm_context *dapm =
 			snd_soc_codec_get_dapm(codec);
 	struct snd_card *card;
-	struct snd_info_entry *entry;
 
 	snd_soc_add_codec_controls(codec, msm_sdw_controls,
 			ARRAY_SIZE(msm_sdw_controls));
@@ -1394,16 +1383,15 @@ static int msm_sdw_audrx_init(struct snd_soc_pcm_runtime *rtd)
 	snd_soc_dapm_sync(dapm);
 	msm_sdw_gpio_cb(msm_config_sdw_gpio, codec);
 	card = rtd->card->snd_card;
-	entry = snd_register_module_info(card->module, "codecs",
-					 card->proc_root);
-	if (!entry) {
+	if (!codec_root)
+		codec_root = snd_register_module_info(card->module, "codecs",
+						      card->proc_root);
+	if (!codec_root) {
 		pr_debug("%s: Cannot create codecs module entry\n",
 			 __func__);
-		msm_sdw_codec_root = NULL;
 		goto done;
 	}
-	msm_sdw_codec_root = entry;
-	msm_sdw_codec_info_create_codec_entry(msm_sdw_codec_root, codec);
+	msm_sdw_codec_info_create_codec_entry(codec_root, codec);
 done:
 	return 0;
 }
@@ -2235,7 +2223,7 @@ static struct snd_soc_dai_link msm_int_dai[] = {
 	},
 	{/* hw:x,35 */
 		.name = LPASS_BE_INT5_MI2S_TX,
-		.stream_name = "INT5_mi2s Capture",
+		.stream_name = "INT5 MI2S Capture",
 		.cpu_dai_name = "msm-dai-q6-mi2s.12",
 		.platform_name = "msm-pcm-hostless",
 		.codec_name = "msm_sdw_codec",
@@ -3033,7 +3021,7 @@ static int msm_internal_init(struct platform_device *pdev,
 			AFE_API_VERSION_I2S_CONFIG;
 	pdata->digital_cdc_core_clk.clk_id =
 			Q6AFE_LPASS_CLK_ID_INT_MCLK_0;
-	pdata->digital_cdc_core_clk.clk_freq_in_hz = 0;
+	pdata->digital_cdc_core_clk.clk_freq_in_hz = pdata->mclk_freq;
 	pdata->digital_cdc_core_clk.clk_attri =
 			Q6AFE_LPASS_CLK_ATTRIBUTE_COUPLE_NO;
 	pdata->digital_cdc_core_clk.clk_root =
