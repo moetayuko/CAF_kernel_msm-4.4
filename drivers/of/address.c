@@ -902,19 +902,47 @@ out:
 }
 EXPORT_SYMBOL_GPL(of_dma_get_range);
 
+/*
+ * DMA from some device types is always cache-coherent, and in some unfortunate
+ * cases the "dma-coherent" property is not used.
+ */
+static const char *of_device_dma_coherent_tbl[] = {
+	/*
+	 * Virtio MMIO devices are assumed to be cache-coherent when accessing
+	 * main memory. Neither QEMU nor kvmtool emit "dma-coherent" properties
+	 * for their generated virtio MMIO device nodes, and the binding
+	 * documentation doesn't mention them either. When using the DMA API
+	 * (e.g. because there is an IOMMU in the system), we must report true
+	 * here to avoid lockups where writes to the vring via a non-coherent
+	 * mapping are not made visible to the device emulation.
+	 */
+	"virtio,mmio",
+	NULL,
+};
+
 /**
  * of_dma_is_coherent - Check if device is coherent
  * @np:	device node
  *
  * It returns true if "dma-coherent" property was found
- * for this device in DT.
+ * for this device in DT or the device is statically known to be
+ * coherent.
  */
 bool of_dma_is_coherent(struct device_node *np)
 {
 	struct device_node *node = of_node_get(np);
 
+	/*
+	 * Check for implicit DMA coherence first, since we don't want
+	 * to inherit this.
+	 */
+	if (of_device_compatible_match(np, of_device_dma_coherent_tbl)) {
+		of_node_put(node);
+		return true;
+	}
+
 	while (node) {
-		if (of_property_read_bool(node, "dma-coherent")) {
+		if (of_property_read_bool(node, "dma-coherent")){
 			of_node_put(node);
 			return true;
 		}
