@@ -262,6 +262,12 @@ static void msm_isp_unprepare_v4l2_buf(
 		return;
 	}
 
+	if (buf_info->num_planes > VIDEO_MAX_PLANES) {
+		pr_err("%s: Invalid num_planes %d , stream id %x\n",
+			__func__, buf_info->num_planes, stream_id);
+		return;
+	}
+
 	bufq = msm_isp_get_bufq(buf_mgr, buf_info->bufq_handle);
 	if (!bufq) {
 		pr_err("%s: Invalid bufq, stream id %x\n",
