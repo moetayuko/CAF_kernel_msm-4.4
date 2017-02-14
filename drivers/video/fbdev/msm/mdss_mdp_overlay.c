@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2016, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2017, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -1471,6 +1471,23 @@ static void __unstage_pipe_and_clean_buf(struct msm_fb_data_type *mfd,
 		__pipe_buf_mark_cleanup(mfd, buf);
 }
 
+static int __dest_scaler_setup(struct msm_fb_data_type *mfd)
+{
+	struct mdss_mdp_ctl *ctl = mfd_to_ctl(mfd);
+
+	mutex_lock(&ctl->ds_lock);
+
+	if (ctl->mixer_left)
+		mdss_mdp_dest_scaler_setup_locked(ctl->mixer_left);
+
+	if (ctl->mixer_right)
+		mdss_mdp_dest_scaler_setup_locked(ctl->mixer_right);
+
+	mutex_unlock(&ctl->ds_lock);
+
+	return 0;
+}
+
 static int __overlay_queue_pipes(struct msm_fb_data_type *mfd)
 {
 	struct mdss_overlay_private *mdp5_data = mfd_to_mdp5_data(mfd);
@@ -1930,6 +1947,39 @@ static void __restore_pipe(struct mdss_mdp_pipe *pipe)
 	pipe->restore_roi = false;
 }
 
+static void __restore_dest_scaler_roi(struct mdss_mdp_ctl *ctl)
+{
+	struct mdss_panel_info *pinfo = &ctl->panel_data->panel_info;
+	struct mdss_mdp_ctl *sctl = mdss_mdp_get_split_ctl(ctl);
+
+	if (is_dest_scaling_pu_enable(ctl->mixer_left)) {
+		ctl->mixer_left->ds->panel_roi.x = 0;
+		ctl->mixer_left->ds->panel_roi.y = 0;
+		ctl->mixer_left->ds->panel_roi.w = get_panel_xres(pinfo);
+		ctl->mixer_left->ds->panel_roi.h = get_panel_yres(pinfo);
+
+		if ((ctl->mfd->split_mode == MDP_DUAL_LM_DUAL_DISPLAY) &&
+				sctl) {
+			if (ctl->panel_data->next)
+				pinfo = &ctl->panel_data->next->panel_info;
+			sctl->mixer_left->ds->panel_roi.x = 0;
+			sctl->mixer_left->ds->panel_roi.y = 0;
+			sctl->mixer_left->ds->panel_roi.w =
+				get_panel_xres(pinfo);
+			sctl->mixer_left->ds->panel_roi.h =
+				get_panel_yres(pinfo);
+		} else if (ctl->mfd->split_mode == MDP_DUAL_LM_SINGLE_DISPLAY) {
+			ctl->mixer_right->ds->panel_roi.x =
+				get_panel_xres(pinfo);
+			ctl->mixer_right->ds->panel_roi.y = 0;
+			ctl->mixer_right->ds->panel_roi.w =
+				get_panel_xres(pinfo);
+			ctl->mixer_right->ds->panel_roi.h =
+				get_panel_yres(pinfo);
+		}
+	}
+}
+
  /**
  * __adjust_pipe_rect() - Adjust pipe roi for dual partial update feature.
  * @pipe: pipe to check against.
@@ -2145,6 +2195,9 @@ set_roi:
 			}
 			dual_roi->enabled = false;
 		}
+
+		if (pinfo->partial_update_enabled)
+			__restore_dest_scaler_roi(ctl);
 	}
 
 	pr_debug("after processing: %s l_roi:-> %d %d %d %d r_roi:-> %d %d %d %d, dual_pu_roi:%d\n",
@@ -2358,6 +2411,9 @@ int mdss_mdp_overlay_kickoff(struct msm_fb_data_type *mfd,
 	mutex_unlock(&mdp5_data->list_lock);
 
 	mdp5_data->kickoff_released = false;
+	ATRACE_BEGIN("dest_scaler_programming");
+	ret = __dest_scaler_setup(mfd);
+	ATRACE_END("dest_scaler_programming");
 
 	if (mfd->panel.type == WRITEBACK_PANEL) {
 		ATRACE_BEGIN("wb_kickoff");
@@ -4459,8 +4515,10 @@ static int mdss_bl_scale_config(struct msm_fb_data_type *mfd,
 	mfd->bl_scale = data->scale;
 	pr_debug("update scale = %d\n", mfd->bl_scale);
 
-	/* update current backlight to use new scaling*/
-	mdss_fb_set_backlight(mfd, curr_bl);
+	/* Update current backlight to use new scaling, if it is not zero */
+	if (curr_bl)
+		mdss_fb_set_backlight(mfd, curr_bl);
+
 	mutex_unlock(&mfd->bl_lock);
 	return ret;
 }

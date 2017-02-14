@@ -24,6 +24,9 @@
 #include "sde_rotator_smmu.h"
 #include "sde_rotator_formats.h"
 
+#define MDSS_MDP_HW_REV_320	0x30020000  /* sdm660 */
+#define MDSS_MDP_HW_REV_330	0x30030000  /* sdm630 */
+
 struct sde_mult_factor {
 	uint32_t numer;
 	uint32_t denom;
@@ -39,6 +42,8 @@ struct sde_mdp_set_ot_params {
 	u32 reg_off_vbif_lim_conf;
 	u32 reg_off_mdp_clk_ctrl;
 	u32 bit_off_mdp_clk_ctrl;
+	char __iomem *rotsts_base;
+	u32 rotsts_busy_mask;
 };
 
 enum sde_bus_vote_type {
@@ -164,7 +169,9 @@ struct sde_rot_data_type {
 
 	int iommu_attached;
 	int iommu_ref_cnt;
-
+	int (*iommu_ctrl)(int enable);
+	int (*secure_session_ctrl)(int enable);
+	int (*wait_for_transition)(int state, int request);
 	struct sde_rot_vbif_debug_bus *nrt_vbif_dbg_bus;
 	u32 nrt_vbif_dbg_bus_size;
 
@@ -173,7 +180,7 @@ struct sde_rot_data_type {
 
 	void *sde_rot_hw;
 	int sec_cam_en;
-
+	bool callback_request;
 	struct ion_client *iclient;
 };
 

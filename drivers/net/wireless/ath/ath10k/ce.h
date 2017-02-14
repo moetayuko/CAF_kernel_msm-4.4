@@ -38,6 +38,10 @@ struct ath10k_ce_pipe;
 
 #define CE_DESC_FLAGS_GATHER         (1 << 0)
 #define CE_DESC_FLAGS_BYTE_SWAP      (1 << 1)
+#define CE_WCN3990_DESC_FLAGS_GATHER BIT(31)
+
+#define CE_DESC_FLAGS_GET_MASK		0x1F
+#define CE_DESC_37BIT_ADDR_MASK		0x1FFFFFFFFF
 
 /* Following desc flags are used in QCA99X0 */
 #define CE_DESC_FLAGS_HOST_INT_DIS	(1 << 2)
@@ -46,11 +50,26 @@ struct ath10k_ce_pipe;
 #define CE_DESC_FLAGS_META_DATA_MASK ar->hw_values->ce_desc_meta_data_mask
 #define CE_DESC_FLAGS_META_DATA_LSB  ar->hw_values->ce_desc_meta_data_lsb
 
+#ifndef CONFIG_ATH10K_SNOC
 struct ce_desc {
 	__le32 addr;
 	__le16 nbytes;
 	__le16 flags; /* %CE_DESC_FLAGS_ */
 };
+#else
+struct ce_desc {
+	union {
+		__le64 addr;
+		struct {
+			__le32 addr_lo;
+			__le32 addr_hi;
+		};
+	};
+	u16 nbytes; /* length in register map */
+	u16 flags; /* fw_metadata_high */
+	u32 toeplitz_hash_result;
+};
+#endif
 
 struct ath10k_ce_ring {
 	/* Number of entries in this ring; must be power of 2 */
@@ -230,6 +249,8 @@ void ath10k_ce_per_engine_service_any(struct ath10k *ar);
 void ath10k_ce_per_engine_service(struct ath10k *ar, unsigned int ce_id);
 int ath10k_ce_disable_interrupts(struct ath10k *ar);
 void ath10k_ce_enable_interrupts(struct ath10k *ar);
+void ath10k_ce_disable_per_ce_interrupts(struct ath10k *ar, unsigned int ce_id);
+void ath10k_ce_enable_per_ce_interrupts(struct ath10k *ar, unsigned int ce_id);
 
 /* ce_attr.flags values */
 /* Use NonSnooping PCIe accesses? */

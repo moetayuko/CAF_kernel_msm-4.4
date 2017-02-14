@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2005-2011 Atheros Communications Inc.
- * Copyright (c) 2011-2013 Qualcomm Atheros, Inc.
+ * Copyright (c) 2011-2013, 2017 Qualcomm Atheros, Inc.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -24,6 +24,7 @@
 #include <linux/pci.h>
 #include <linux/uuid.h>
 #include <linux/time.h>
+#include <soc/qcom/socinfo.h>
 
 #include "htt.h"
 #include "htc.h"
@@ -661,6 +662,10 @@ enum ath10k_tx_pause_reason {
 	ATH10K_TX_PAUSE_MAX,
 };
 
+struct fw_flag {
+	u32 flags;
+};
+
 struct ath10k_fw_file {
 	const struct firmware *firmware;
 
@@ -704,6 +709,7 @@ struct ath10k {
 	struct ieee80211_ops *ops;
 	struct device *dev;
 	u8 mac_addr[ETH_ALEN];
+	u8 base_mac_addr[ETH_ALEN];
 
 	enum ath10k_hw_rev hw_rev;
 	u16 dev_id;
@@ -919,6 +925,9 @@ struct ath10k {
 	u32 (*bus_read32)(void *ar, u32 offset);
 	spinlock_t ce_lock; /* lock for CE access */
 	void *ce_states;
+	struct fw_flag *fw_flags;
+	/* set for bmi chip sets */
+	bool is_bmi;
 	/* must be last */
 	u8 drv_priv[0] __aligned(sizeof(void *));
 };

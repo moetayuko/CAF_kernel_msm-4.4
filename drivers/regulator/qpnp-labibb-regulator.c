@@ -333,7 +333,7 @@ enum ibb_mode {
 	IBB_HW_SW_CONTROL,
 };
 
-static const int ibb_discharge_resistor_table[] = {
+static const int ibb_dischg_res_table[] = {
 	300,
 	64,
 	32,
@@ -946,38 +946,27 @@ static int qpnp_ibb_soft_start_ctl_v1(struct qpnp_labibb *labibb,
 
 	rc = of_property_read_u32(of_node, "qcom,qpnp-ibb-discharge-resistor",
 			&tmp);
+	if (!rc) {
+		for (val = 0; val < ARRAY_SIZE(ibb_dischg_res_table); val++) {
+			if (ibb_dischg_res_table[val] == tmp)
+				break;
+		}
 
-	if (rc < 0) {
-		pr_err("qcom,qpnp-ibb-discharge-resistor is missing, rc = %d\n",
-			rc);
-		return rc;
+		if (val == ARRAY_SIZE(ibb_dischg_res_table)) {
+			pr_err("Invalid value in qcom,qpnp-ibb-discharge-resistor\n");
+			return -EINVAL;
+		}
+
+		rc = qpnp_labibb_write(labibb, labibb->ibb_base +
+				REG_IBB_SOFT_START_CTL, &val, 1);
+		if (rc < 0) {
+			pr_err("write to register %x failed rc = %d\n",
+				REG_IBB_SOFT_START_CTL,	rc);
+			return rc;
+		}
 	}
 
-	if (labibb->mode == QPNP_LABIBB_AMOLED_MODE) {
-		/*
-		 * AMOLED mode needs ibb discharge resistor to be
-		 * configured for 300KOhm
-		 */
-		if (tmp < ibb_discharge_resistor_table[0])
-			tmp = ibb_discharge_resistor_table[0];
-	}
-
-	for (val = 0; val < ARRAY_SIZE(ibb_discharge_resistor_table); val++)
-		if (ibb_discharge_resistor_table[val] == tmp)
-			break;
-
-	if (val == ARRAY_SIZE(ibb_discharge_resistor_table)) {
-		pr_err("Invalid value in qcom,qpnp-ibb-discharge-resistor\n");
-		return -EINVAL;
-	}
-
-	rc = qpnp_labibb_write(labibb, labibb->ibb_base +
-			REG_IBB_SOFT_START_CTL, &val, 1);
-	if (rc < 0)
-		pr_err("write to register %x failed rc = %d\n",
-			REG_IBB_SOFT_START_CTL,	rc);
-
-	return rc;
+	return 0;
 }
 
 static int qpnp_ibb_soft_start_ctl_v2(struct qpnp_labibb *labibb,
@@ -2376,7 +2365,7 @@ static int qpnp_lab_regulator_is_enabled(struct regulator_dev *rdev)
 }
 
 static int qpnp_lab_regulator_set_voltage(struct regulator_dev *rdev,
-				int min_uV, int max_uV, unsigned *selector)
+				int min_uV, int max_uV, unsigned int *selector)
 {
 	int rc, new_uV;
 	u8 val;
@@ -3293,7 +3282,7 @@ static int qpnp_ibb_regulator_is_enabled(struct regulator_dev *rdev)
 }
 
 static int qpnp_ibb_regulator_set_voltage(struct regulator_dev *rdev,
-				int min_uV, int max_uV, unsigned *selector)
+				int min_uV, int max_uV, unsigned int *selector)
 {
 	int rc = 0;
 
@@ -3408,7 +3397,8 @@ static int register_qpnp_ibb_regulator(struct qpnp_labibb *labibb,
 	 * before by the bootloader.
 	 */
 	if (labibb->pmic_rev_id->pmic_subtype == PMI8998_SUBTYPE)
-		labibb->swire_control = val & IBB_ENABLE_CTL_SWIRE_RDY;
+		labibb->swire_control = ibb_enable_ctl &
+						IBB_ENABLE_CTL_SWIRE_RDY;
 
 	if (ibb_enable_ctl &
 		(IBB_ENABLE_CTL_SWIRE_RDY | IBB_ENABLE_CTL_MODULE_EN)) {
@@ -3658,12 +3648,10 @@ static int qpnp_labibb_regulator_probe(struct platform_device *pdev)
 	u8 type, revision;
 	int rc = 0;
 
-	labibb = devm_kzalloc(&pdev->dev,
-			sizeof(struct qpnp_labibb), GFP_KERNEL);
-	if (labibb == NULL) {
-		pr_err("labibb allocation failed.\n");
+	labibb = devm_kzalloc(&pdev->dev, sizeof(*labibb), GFP_KERNEL);
+	if (labibb == NULL)
 		return -ENOMEM;
-	}
+
 	labibb->regmap = dev_get_regmap(pdev->dev.parent, NULL);
 	if (!labibb->regmap) {
 		dev_err(&pdev->dev, "Couldn't get parent's regmap\n");
@@ -3859,7 +3847,7 @@ static int qpnp_labibb_regulator_remove(struct platform_device *pdev)
 	return 0;
 }
 
-static struct of_device_id spmi_match_table[] = {
+static const struct of_device_id spmi_match_table[] = {
 	{ .compatible = QPNP_LABIBB_REGULATOR_DRIVER_NAME, },
 	{ },
 };

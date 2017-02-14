@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015-2016, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2015-2017, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -36,9 +36,9 @@ struct cpr3_thread;
  * from 0 to 63.  bit_start must be less than or equal to bit_end.
  */
 struct cpr3_fuse_param {
-	unsigned		row;
-	unsigned		bit_start;
-	unsigned		bit_end;
+	unsigned int		row;
+	unsigned int		bit_start;
+	unsigned int		bit_end;
 };
 
 /* Each CPR3 sensor has 16 ring oscillators */
@@ -904,6 +904,8 @@ int cpr3_apm_init(struct cpr3_controller *ctrl);
 int cpr3_mem_acc_init(struct cpr3_regulator *vreg);
 void cprh_adjust_voltages_for_apm(struct cpr3_regulator *vreg);
 void cprh_adjust_voltages_for_mem_acc(struct cpr3_regulator *vreg);
+int cpr3_adjust_target_quotients(struct cpr3_regulator *vreg,
+			int *fuse_volt_adjust);
 
 #else
 
@@ -1019,7 +1021,6 @@ static inline int cpr3_limit_open_loop_voltages(struct cpr3_regulator *vreg)
 static inline void cpr3_open_loop_voltage_as_ceiling(
 			struct cpr3_regulator *vreg)
 {
-	return;
 }
 
 static inline int cpr3_limit_floor_voltages(struct cpr3_regulator *vreg)
@@ -1029,7 +1030,6 @@ static inline int cpr3_limit_floor_voltages(struct cpr3_regulator *vreg)
 
 static inline void cpr3_print_quots(struct cpr3_regulator *vreg)
 {
-	return;
 }
 
 static inline int cpr3_adjust_fused_open_loop_voltages(
@@ -1082,6 +1082,12 @@ static inline void cprh_adjust_voltages_for_apm(struct cpr3_regulator *vreg)
 
 static inline void cprh_adjust_voltages_for_mem_acc(struct cpr3_regulator *vreg)
 {
+}
+
+static inline int cpr3_adjust_target_quotients(struct cpr3_regulator *vreg,
+			int *fuse_volt_adjust)
+{
+	return 0;
 }
 
 #endif /* CONFIG_REGULATOR_CPR3 */

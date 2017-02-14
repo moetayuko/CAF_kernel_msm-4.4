@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2016, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2017, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -124,6 +124,7 @@
 #define DS_ENHANCER_UPDATE  BIT(5)
 #define DS_VALIDATE         BIT(6)
 #define DS_DIRTY_UPDATE     BIT(7)
+#define DS_PU_ENABLE        BIT(8)
 
 /**
  * Destination Scaler DUAL mode overfetch pixel count
@@ -386,6 +387,7 @@ struct mdss_mdp_destination_scaler {
 	u16 last_mixer_height;
 	u32 flags;
 	struct mdp_scale_data_v2 scaler;
+	struct mdss_rect panel_roi;
 };
 
 
@@ -553,6 +555,7 @@ struct mdss_mdp_ctl {
 	bool switch_with_handoff;
 	struct mdss_mdp_avr_info avr_info;
 	bool commit_in_progress;
+	struct mutex ds_lock;
 };
 
 struct mdss_mdp_mixer {
@@ -1169,6 +1172,14 @@ static inline int is_dest_scaling_enable(struct mdss_mdp_mixer *mixer)
 			mixer && mixer->ds && (mixer->ds->flags & DS_ENABLE));
 }
 
+static inline int is_dest_scaling_pu_enable(struct mdss_mdp_mixer *mixer)
+{
+	if (is_dest_scaling_enable(mixer))
+		return (mixer->ds->flags & DS_PU_ENABLE);
+
+	return 0;
+}
+
 static inline u32 get_ds_input_width(struct mdss_mdp_mixer *mixer)
 {
 	struct mdss_mdp_destination_scaler *ds;
@@ -1304,10 +1315,13 @@ static inline struct clk *mdss_mdp_get_clk(u32 clk_idx)
 static inline void mdss_update_sd_client(struct mdss_data_type *mdata,
 							bool status)
 {
-	if (status)
+	if (status) {
 		atomic_inc(&mdata->sd_client_count);
-	else
+	} else {
 		atomic_add_unless(&mdss_res->sd_client_count, -1, 0);
+		if (!atomic_read(&mdss_res->sd_client_count))
+			wake_up_all(&mdata->secure_waitq);
+	}
 }
 
 static inline void mdss_update_sc_client(struct mdss_data_type *mdata,
@@ -1959,6 +1973,7 @@ void mdss_mdp_enable_hw_irq(struct mdss_data_type *mdata);
 void mdss_mdp_disable_hw_irq(struct mdss_data_type *mdata);
 
 void mdss_mdp_set_supported_formats(struct mdss_data_type *mdata);
+int mdss_mdp_dest_scaler_setup_locked(struct mdss_mdp_mixer *mixer);
 
 #ifdef CONFIG_FB_MSM_MDP_NONE
 struct mdss_data_type *mdss_mdp_get_mdata(void)

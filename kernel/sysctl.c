@@ -133,6 +133,7 @@ static int ten_thousand = 10000;
 #endif
 #ifdef CONFIG_SCHED_HMP
 static int one_thousand = 1000;
+static int max_freq_reporting_policy = FREQ_REPORT_INVALID_POLICY - 1;
 #endif
 
 /* this is needed for the proc_doulongvec_minmax of vm_dirty_bytes */
@@ -178,7 +179,7 @@ extern int no_unaligned_warning;
 #define SYSCTL_WRITES_WARN	 0
 #define SYSCTL_WRITES_STRICT	 1
 
-static int sysctl_writes_strict = SYSCTL_WRITES_WARN;
+static int sysctl_writes_strict = SYSCTL_WRITES_STRICT;
 
 static int proc_do_cad_pid(struct ctl_table *table, int write,
 		  void __user *buffer, size_t *lenp, loff_t *ppos);
@@ -297,6 +298,7 @@ static struct ctl_table kern_table[] = {
 		.mode		= 0644,
 		.proc_handler	= proc_dointvec_minmax,
 		.extra1		= &zero,
+		.extra2		= &max_freq_reporting_policy,
 	},
 	{
 		.procname	= "sched_freq_inc_notify",
@@ -447,13 +449,6 @@ static struct ctl_table kern_table[] = {
 		.proc_handler   = proc_dointvec,
 	},
 	{
-		.procname       = "sched_new_task_windows",
-		.data           = &sysctl_sched_new_task_windows,
-		.maxlen         = sizeof(unsigned int),
-		.mode           = 0644,
-		.proc_handler   = sched_window_update_handler,
-	},
-	{
 		.procname	= "sched_pred_alert_freq",
 		.data		= &sysctl_sched_pred_alert_freq,
 		.maxlen		= sizeof(unsigned int),
@@ -591,7 +586,8 @@ static struct ctl_table kern_table[] = {
 		.data		= &sysctl_sched_time_avg,
 		.maxlen		= sizeof(unsigned int),
 		.mode		= 0644,
-		.proc_handler	= proc_dointvec,
+		.proc_handler	= proc_dointvec_minmax,
+		.extra1		= &one,
 	},
 	{
 		.procname	= "sched_shares_window_ns",
