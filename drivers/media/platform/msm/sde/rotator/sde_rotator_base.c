@@ -30,6 +30,7 @@
 #include "sde_rotator_base.h"
 #include "sde_rotator_util.h"
 #include "sde_rotator_trace.h"
+#include "sde_rotator_debug.h"
 
 static inline u64 fudge_factor(u64 val, u32 numer, u32 denom)
 {
@@ -78,8 +79,6 @@ u32 sde_apply_comp_ratio_factor(u32 quota,
 #define RES_UHD		(3840*2160)
 #define RES_WQXGA		(2560*1600)
 #define XIN_HALT_TIMEOUT_US	0x4000
-#define MDSS_MDP_HW_REV_320	0x30020000  /* sdm660 */
-#define MDSS_MDP_HW_REV_330	0x30030000  /* sdm630 */
 
 static int sde_mdp_wait_for_xin_halt(u32 xin_id)
 {
@@ -237,6 +236,8 @@ static u32 get_ot_limit(u32 reg_off, u32 bit_off,
 
 exit:
 	SDEROT_DBG("ot_lim=%d\n", ot_lim);
+	SDEROT_EVTLOG(params->width, params->height, params->fmt, params->fps,
+			ot_lim);
 	return ot_lim;
 }
 
@@ -248,6 +249,7 @@ void sde_mdp_set_ot_limit(struct sde_mdp_set_ot_params *params)
 		params->reg_off_vbif_lim_conf;
 	u32 bit_off_vbif_lim_conf = (params->xin_id % 4) * 8;
 	u32 reg_val;
+	u32 sts;
 	bool forced_on;
 
 	ot_lim = get_ot_limit(
@@ -257,6 +259,16 @@ void sde_mdp_set_ot_limit(struct sde_mdp_set_ot_params *params)
 
 	if (ot_lim == 0)
 		goto exit;
+
+	if (params->rotsts_base && params->rotsts_busy_mask) {
+		sts = readl_relaxed(params->rotsts_base);
+		if (sts & params->rotsts_busy_mask) {
+			SDEROT_ERR(
+				"Rotator still busy, should not modify VBIF\n");
+			SDEROT_EVTLOG_TOUT_HANDLER(
+				"rot", "vbif_dbg_bus", "panic");
+		}
+	}
 
 	trace_rot_perf_set_ot(params->num, params->xin_id, ot_lim);
 
@@ -283,6 +295,7 @@ void sde_mdp_set_ot_limit(struct sde_mdp_set_ot_params *params)
 		force_on_xin_clk(params->bit_off_mdp_clk_ctrl,
 			params->reg_off_mdp_clk_ctrl, false);
 
+	SDEROT_EVTLOG(params->num, params->xin_id, ot_lim);
 exit:
 	return;
 }

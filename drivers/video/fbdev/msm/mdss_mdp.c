@@ -1,7 +1,7 @@
 /*
  * MDSS MDP Interface (used by framebuffer core)
  *
- * Copyright (c) 2007-2016, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2007-2017, The Linux Foundation. All rights reserved.
  * Copyright (C) 2007 Google Incorporated
  *
  * This software is licensed under the terms of the GNU General Public
@@ -98,6 +98,7 @@ static DEFINE_SPINLOCK(mdss_mdp_intr_lock);
 static DEFINE_MUTEX(mdp_clk_lock);
 static DEFINE_MUTEX(mdp_iommu_ref_cnt_lock);
 static DEFINE_MUTEX(mdp_fs_idle_pc_lock);
+static DEFINE_MUTEX(mdp_sec_ref_cnt_lock);
 
 static struct mdss_panel_intf pan_types[] = {
 	{"dsi", MDSS_PANEL_INTF_DSI},
@@ -1794,11 +1795,13 @@ static int mdss_mdp_irq_clk_setup(struct mdss_data_type *mdata)
 		return -EINVAL;
 	}
 
-	mdata->venus = devm_regulator_get_optional(&mdata->pdev->dev,
-		"gdsc-venus");
-	if (IS_ERR_OR_NULL(mdata->venus)) {
-		mdata->venus = NULL;
-		pr_debug("unable to get venus gdsc regulator\n");
+	mdata->core_gdsc = devm_regulator_get_optional(&mdata->pdev->dev,
+		"gdsc-core");
+	if (IS_ERR_OR_NULL(mdata->core_gdsc)) {
+		mdata->core_gdsc = NULL;
+		pr_err("unable to get core gdsc regulator\n");
+	} else {
+		pr_debug("core gdsc regulator found\n");
 	}
 
 	mdata->fs_ena = false;
@@ -2104,6 +2107,7 @@ static void mdss_mdp_hw_rev_caps_init(struct mdss_data_type *mdata)
 		set_bit(MDSS_CAPS_10_BIT_SUPPORTED, mdata->mdss_caps_map);
 		set_bit(MDSS_CAPS_AVR_SUPPORTED, mdata->mdss_caps_map);
 		set_bit(MDSS_CAPS_SEC_DETACH_SMMU, mdata->mdss_caps_map);
+		mdss_set_quirk(mdata, MDSS_QUIRK_HDR_SUPPORT_ENABLED);
 		break;
 	case MDSS_MDP_HW_REV_320:
 		mdata->max_target_zorder = 7; /* excluding base layer */
@@ -2136,6 +2140,7 @@ static void mdss_mdp_hw_rev_caps_init(struct mdss_data_type *mdata)
 		set_bit(MDSS_CAPS_3D_MUX_UNDERRUN_RECOVERY_SUPPORTED,
 			mdata->mdss_caps_map);
 		set_bit(MDSS_CAPS_QSEED3, mdata->mdss_caps_map);
+		set_bit(MDSS_CAPS_DEST_SCALER, mdata->mdss_caps_map);
 		set_bit(MDSS_CAPS_MDP_VOTE_CLK_NOT_SUPPORTED,
 			mdata->mdss_caps_map);
 		mdss_mdp_init_default_prefill_factors(mdata);
@@ -2143,10 +2148,10 @@ static void mdss_mdp_hw_rev_caps_init(struct mdss_data_type *mdata)
 		mdss_set_quirk(mdata, MDSS_QUIRK_DSC_2SLICE_PU_THRPUT);
 		mdss_set_quirk(mdata, MDSS_QUIRK_MMSS_GDSC_COLLAPSE);
 		mdss_set_quirk(mdata, MDSS_QUIRK_MDP_CLK_SET_RATE);
+		mdss_set_quirk(mdata, MDSS_QUIRK_DMA_BI_DIR);
 		mdata->has_wb_ubwc = true;
 		set_bit(MDSS_CAPS_10_BIT_SUPPORTED, mdata->mdss_caps_map);
 		set_bit(MDSS_CAPS_SEC_DETACH_SMMU, mdata->mdss_caps_map);
-		mdss_set_quirk(mdata, MDSS_QUIRK_HDR_SUPPORT_ENABLED);
 		break;
 	default:
 		mdata->max_target_zorder = 4; /* excluding base layer */
@@ -2370,10 +2375,10 @@ void mdss_mdp_footswitch_ctrl_splash(int on)
 		if (on) {
 			mdata->handoff_pending = true;
 			pr_debug("Enable MDP FS for splash.\n");
-			if (mdata->venus) {
-				ret = regulator_enable(mdata->venus);
+			if (mdata->core_gdsc) {
+				ret = regulator_enable(mdata->core_gdsc);
 				if (ret)
-					pr_err("venus failed to enable\n");
+					pr_err("core_gdsc failed to enable\n");
 			}
 
 			ret = regulator_enable(mdata->fs);
@@ -2387,8 +2392,8 @@ void mdss_mdp_footswitch_ctrl_splash(int on)
 			mdss_bus_bandwidth_ctrl(false);
 			mdss_mdp_clk_ctrl(MDP_BLOCK_POWER_OFF);
 			regulator_disable(mdata->fs);
-			if (mdata->venus)
-				regulator_disable(mdata->venus);
+			if (mdata->core_gdsc)
+				regulator_disable(mdata->core_gdsc);
 			mdata->handoff_pending = false;
 		}
 	} else {
@@ -2849,6 +2854,7 @@ static int mdss_mdp_probe(struct platform_device *pdev)
 	INIT_LIST_HEAD(&mdata->reg_bus_clist);
 	atomic_set(&mdata->sd_client_count, 0);
 	atomic_set(&mdata->active_intf_cnt, 0);
+	init_waitqueue_head(&mdata->secure_waitq);
 
 	mdss_res->mdss_util = mdss_get_util_intf();
 	if (mdss_res->mdss_util == NULL) {
@@ -4156,6 +4162,7 @@ static int mdss_mdp_parse_dt_prefill(struct platform_device *pdev)
 static void mdss_mdp_parse_vbif_qos(struct platform_device *pdev)
 {
 	struct mdss_data_type *mdata = platform_get_drvdata(pdev);
+	u32 npriority_lvl_nrt;
 	int rc;
 
 	mdata->npriority_lvl = mdss_mdp_parse_dt_prop_len(pdev,
@@ -4181,8 +4188,20 @@ static void mdss_mdp_parse_vbif_qos(struct platform_device *pdev)
 		return;
 	}
 
-	mdata->npriority_lvl = mdss_mdp_parse_dt_prop_len(pdev,
+	npriority_lvl_nrt = mdss_mdp_parse_dt_prop_len(pdev,
 			"qcom,mdss-vbif-qos-nrt-setting");
+
+	if (!npriority_lvl_nrt) {
+		pr_debug("no vbif nrt priorities found rt:%d\n",
+			mdata->npriority_lvl);
+		return;
+	} else if (npriority_lvl_nrt != mdata->npriority_lvl) {
+		/* driver expects same number for both nrt and rt */
+		pr_err("invalid nrt settings nrt(%d) != rt(%d)\n",
+			npriority_lvl_nrt, mdata->npriority_lvl);
+		return;
+	}
+
 	if (mdata->npriority_lvl == MDSS_VBIF_QOS_REMAP_ENTRIES) {
 		mdata->vbif_nrt_qos = kzalloc(sizeof(u32) *
 				mdata->npriority_lvl, GFP_KERNEL);
@@ -4200,7 +4219,7 @@ static void mdss_mdp_parse_vbif_qos(struct platform_device *pdev)
 		}
 	} else {
 		mdata->npriority_lvl = 0;
-		pr_debug("Invalid or no vbif qos nrt seting\n");
+		pr_debug("Invalid or no vbif qos nrt setting\n");
 	}
 }
 
@@ -5059,6 +5078,7 @@ static void mdss_mdp_footswitch_ctrl(struct mdss_data_type *mdata, int on)
 {
 	int ret;
 	int active_cnt = 0;
+	bool footswitch_suspend = false;
 
 	if (!mdata->fs)
 		return;
@@ -5069,11 +5089,20 @@ static void mdss_mdp_footswitch_ctrl(struct mdss_data_type *mdata, int on)
 	if (on) {
 		if (!mdata->fs_ena) {
 			pr_debug("Enable MDP FS\n");
-			if (mdata->venus) {
-				ret = regulator_enable(mdata->venus);
+			if (mdata->core_gdsc) {
+				ret = regulator_enable(mdata->core_gdsc);
 				if (ret)
-					pr_err("venus failed to enable\n");
+					pr_err("core_gdsc failed to enable\n");
 			}
+
+			/*
+			 * Advise RPM to not turn MMSS GDSC off, this will
+			 * ensure that GDSC off is maintained during Active
+			 * display and during Idle display
+			 */
+			if (mdss_has_quirk(mdata,
+					MDSS_QUIRK_MMSS_GDSC_COLLAPSE))
+				mdss_rpm_set_msg_ram(true);
 
 			ret = regulator_enable(mdata->fs);
 			if (ret)
@@ -5092,13 +5121,6 @@ static void mdss_mdp_footswitch_ctrl(struct mdss_data_type *mdata, int on)
 			active_cnt = atomic_read(&mdata->active_intf_cnt);
 			if (active_cnt != 0) {
 				/*
-				 * Advise RPM to not turn MMSS GDSC off during
-				 * idle case.
-				 */
-				if (mdss_has_quirk(mdata,
-						MDSS_QUIRK_MMSS_GDSC_COLLAPSE))
-					mdss_rpm_set_msg_ram(true);
-				/*
 				 * Turning off GDSC while overlays are still
 				 * active.
 				 */
@@ -5109,14 +5131,8 @@ static void mdss_mdp_footswitch_ctrl(struct mdss_data_type *mdata, int on)
 				pr_debug("idle pc. active overlays=%d\n",
 					active_cnt);
 			} else {
-				/*
-				 * Advise RPM to turn MMSS GDSC off during
-				 * suspend case
-				 */
-				if (mdss_has_quirk(mdata,
-						MDSS_QUIRK_MMSS_GDSC_COLLAPSE))
-					mdss_rpm_set_msg_ram(false);
 
+				footswitch_suspend = true;
 				mdss_mdp_cx_ctrl(mdata, false);
 				mdss_mdp_batfet_ctrl(mdata, false);
 				mdss_mdp_memory_retention_ctrl(
@@ -5127,8 +5143,21 @@ static void mdss_mdp_footswitch_ctrl(struct mdss_data_type *mdata, int on)
 			if (mdata->en_svs_high)
 				mdss_mdp_config_cx_voltage(mdata, false);
 			regulator_disable(mdata->fs);
-			if (mdata->venus)
-				regulator_disable(mdata->venus);
+			if (mdata->core_gdsc)
+				regulator_disable(mdata->core_gdsc);
+
+			if (footswitch_suspend) {
+				/*
+				 * Advise RPM to turn MMSS GDSC off during
+				 * suspend case, do this after the MDSS GDSC
+				 * regulator OFF, so we can ensure that MMSS
+				 * GDSC will go OFF after the MDSS GDSC
+				 * regulator
+				 */
+				if (mdss_has_quirk(mdata,
+						MDSS_QUIRK_MMSS_GDSC_COLLAPSE))
+					mdss_rpm_set_msg_ram(false);
+			}
 		}
 		mdata->fs_ena = false;
 	}
@@ -5144,6 +5173,27 @@ int mdss_mdp_secure_session_ctrl(unsigned int enable, u64 flags)
 	int ret = 0;
 	uint32_t sid_info;
 	struct scm_desc desc;
+	bool changed = false;
+
+	mutex_lock(&mdp_sec_ref_cnt_lock);
+
+	if (enable) {
+		if (mdata->sec_session_cnt == 0)
+			changed = true;
+		mdata->sec_session_cnt++;
+	} else {
+		if (mdata->sec_session_cnt != 0) {
+			mdata->sec_session_cnt--;
+			if (mdata->sec_session_cnt == 0)
+				changed = true;
+		} else {
+			pr_warn("%s: ref_count is not balanced\n",
+				__func__);
+		}
+	}
+
+	if (!changed)
+		goto end;
 
 	if (test_bit(MDSS_CAPS_SEC_DETACH_SMMU, mdata->mdss_caps_map)) {
 		/*
@@ -5167,7 +5217,8 @@ int mdss_mdp_secure_session_ctrl(unsigned int enable, u64 flags)
 				desc.args[3] = VMID_CP_CAMERA_PREVIEW;
 				mdata->sec_cam_en = 1;
 			} else {
-				return 0;
+				ret = 0;
+				goto end;
 			}
 
 			/* detach smmu contexts */
@@ -5175,7 +5226,8 @@ int mdss_mdp_secure_session_ctrl(unsigned int enable, u64 flags)
 			if (ret) {
 				pr_err("Error while detaching smmu contexts ret = %d\n",
 					ret);
-				return -EINVAL;
+				ret = -EINVAL;
+				goto end;
 			}
 
 			/* let the driver think smmu is still attached */
@@ -5187,7 +5239,8 @@ int mdss_mdp_secure_session_ctrl(unsigned int enable, u64 flags)
 			if (ret) {
 				pr_err("Error scm_call MEM_PROTECT_SD_CTRL(%u) ret=%dm resp=%x\n",
 						enable, ret, resp);
-				return -EINVAL;
+				ret = -EINVAL;
+				goto end;
 			}
 			resp = desc.ret[0];
 
@@ -5220,7 +5273,8 @@ int mdss_mdp_secure_session_ctrl(unsigned int enable, u64 flags)
 			if (ret) {
 				pr_err("Error while attaching smmu contexts ret = %d\n",
 					ret);
-				return -EINVAL;
+				ret = -EINVAL;
+				goto end;
 			}
 		}
 		MDSS_XLOG(enable);
@@ -5243,10 +5297,11 @@ int mdss_mdp_secure_session_ctrl(unsigned int enable, u64 flags)
 		pr_debug("scm_call MEM_PROTECT_SD_CTRL(%u): ret=%d, resp=%x\n",
 				enable, ret, resp);
 	}
-	if (ret)
-		return ret;
 
-	return resp;
+end:
+	mutex_unlock(&mdp_sec_ref_cnt_lock);
+	return ret;
+
 }
 
 static inline int mdss_mdp_suspend_sub(struct mdss_data_type *mdata)

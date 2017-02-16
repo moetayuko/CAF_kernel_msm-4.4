@@ -23,6 +23,7 @@
 		pm660_revid: qcom,revid@100 {
 			compatible = "qcom,qpnp-revid";
 			reg = <0x100 0x100>;
+			qcom,fab-id-valid;
 		};
 
 		qcom,power-on@800 {
@@ -497,6 +498,7 @@
 			#address-cells = <1>;
 			#size-cells = <0>;
 			#io-channel-cells = <1>;
+			qcom,pmic-revid = <&pm660_revid>;
 		};
 
 		pm660_fg: qpnp,fg {
@@ -517,8 +519,10 @@
 				reg = <0x4000 0x100>;
 				interrupts = <0x0 0x40 0x0 IRQ_TYPE_EDGE_BOTH>,
 					     <0x0 0x40 0x1 IRQ_TYPE_EDGE_BOTH>,
-					     <0x0 0x40 0x2 IRQ_TYPE_EDGE_BOTH>,
-					     <0x0 0x40 0x3 IRQ_TYPE_EDGE_BOTH>,
+					     <0x0 0x40 0x2
+							IRQ_TYPE_EDGE_RISING>,
+					     <0x0 0x40 0x3
+							IRQ_TYPE_EDGE_RISING>,
 					     <0x0 0x40 0x4 IRQ_TYPE_EDGE_BOTH>,
 					     <0x0 0x40 0x5
 							IRQ_TYPE_EDGE_RISING>,

@@ -1,4 +1,4 @@
-/* Copyright (c) 2008-2016, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2008-2017, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -169,6 +169,7 @@ enum adreno_gpurev {
 	ADRENO_REV_A430 = 430,
 	ADRENO_REV_A505 = 505,
 	ADRENO_REV_A506 = 506,
+	ADRENO_REV_A508 = 508,
 	ADRENO_REV_A510 = 510,
 	ADRENO_REV_A512 = 512,
 	ADRENO_REV_A530 = 530,
@@ -351,6 +352,7 @@ struct adreno_gpu_core {
  * @ram_cycles_lo: Number of DDR clock cycles for the monitor session
  * @perfctr_pwr_lo: Number of cycles VBIF is stalled by DDR
  * @halt: Atomic variable to check whether the GPU is currently halted
+ * @pending_irq_refcnt: Atomic variable to keep track of running IRQ handlers
  * @ctx_d_debugfs: Context debugfs node
  * @pwrctrl_flag: Flag to hold adreno specific power attributes
  * @profile_buffer: Memdesc holding the drawobj profiling buffer
@@ -408,6 +410,7 @@ struct adreno_device {
 	unsigned int starved_ram_lo;
 	unsigned int perfctr_pwr_lo;
 	atomic_t halt;
+	atomic_t pending_irq_refcnt;
 	struct dentry *ctx_d_debugfs;
 	unsigned long pwrctrl_flag;
 
@@ -1000,6 +1003,7 @@ static inline int adreno_is_a5xx(struct adreno_device *adreno_dev)
 
 ADRENO_TARGET(a505, ADRENO_REV_A505)
 ADRENO_TARGET(a506, ADRENO_REV_A506)
+ADRENO_TARGET(a508, ADRENO_REV_A508)
 ADRENO_TARGET(a510, ADRENO_REV_A510)
 ADRENO_TARGET(a512, ADRENO_REV_A512)
 ADRENO_TARGET(a530, ADRENO_REV_A530)

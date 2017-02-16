@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2016, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2017, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -2559,7 +2559,7 @@ dspp_exit:
 	return ret;
 }
 
-static int pp_dest_scaler_setup(struct mdss_mdp_mixer *mixer)
+int mdss_mdp_dest_scaler_setup_locked(struct mdss_mdp_mixer *mixer)
 {
 	struct mdss_mdp_ctl *ctl;
 	struct mdss_data_type *mdata;
@@ -2618,7 +2618,8 @@ static int pp_dest_scaler_setup(struct mdss_mdp_mixer *mixer)
 
 	writel_relaxed(op_mode, MDSS_MDP_REG_DEST_SCALER_OP_MODE + ds_offset);
 
-	if (ds->flags & DS_SCALE_UPDATE) {
+	if ((ds->flags & DS_SCALE_UPDATE) ||
+			(ds->flags & DS_ENHANCER_UPDATE)) {
 		ret = mdss_mdp_qseed3_setup(&ds->scaler,
 				ds->scaler_base, ds->lut_base,
 				&dest_scaler_fmt);
@@ -2631,11 +2632,6 @@ static int pp_dest_scaler_setup(struct mdss_mdp_mixer *mixer)
 		 * for each commit if there is no change.
 		 */
 		ds->flags &= ~DS_SCALE_UPDATE;
-	}
-
-	if (ds->flags & DS_ENHANCER_UPDATE) {
-		mdss_mdp_scaler_detail_enhance_cfg(&ds->scaler.detail_enhance,
-						ds->scaler_base);
 		ds->flags &= ~DS_ENHANCER_UPDATE;
 	}
 
@@ -2643,7 +2639,9 @@ static int pp_dest_scaler_setup(struct mdss_mdp_mixer *mixer)
 	if (ds->flags & (DS_ENABLE | DS_VALIDATE)) {
 		pr_debug("FLUSH[%d]: flags:%X, op_mode:%x\n",
 				ds->num, ds->flags, op_mode);
+		mutex_lock(&ctl->flush_lock);
 		ctl->flush_bits |= BIT(13 + ds->num);
+		mutex_unlock(&ctl->flush_lock);
 	}
 
 	ds->flags &= ~DS_VALIDATE;
@@ -2760,13 +2758,11 @@ int mdss_mdp_pp_setup_locked(struct mdss_mdp_ctl *ctl)
 	}
 
 	if (ctl->mixer_left) {
-		pp_dest_scaler_setup(ctl->mixer_left);
 		pp_mixer_setup(ctl->mixer_left);
 		pp_dspp_setup(disp_num, ctl->mixer_left);
 		pp_ppb_setup(ctl->mixer_left);
 	}
 	if (ctl->mixer_right) {
-		pp_dest_scaler_setup(ctl->mixer_right);
 		pp_mixer_setup(ctl->mixer_right);
 		pp_dspp_setup(disp_num, ctl->mixer_right);
 		pp_ppb_setup(ctl->mixer_right);
@@ -3980,8 +3976,7 @@ int mdss_mdp_igc_lut_config(struct msm_fb_data_type *mfd,
 	disp_num = config->block - MDP_LOGICAL_BLOCK_DISP_0;
 
 	if (config->ops & MDP_PP_OPS_READ) {
-		if (config->len != IGC_LUT_ENTRIES &&
-		    !pp_ops[IGC].pp_get_config) {
+		if (config->len != IGC_LUT_ENTRIES) {
 			pr_err("invalid len for IGC table for read %d\n",
 			       config->len);
 			return -EINVAL;
@@ -4827,6 +4822,11 @@ gamut_clk_off:
 				goto gamut_set_dirty;
 			}
 		}
+		if (pp_gm_has_invalid_lut_size(config)) {
+			pr_debug("invalid lut size for gamut\n");
+			ret = -EINVAL;
+			goto gamut_config_exit;
+		}
 		local_cfg = *config;
 		tbl_off = mdss_pp_res->gamut_tbl[disp_num];
 		for (i = 0; i < MDP_GAMUT_TABLE_NUM; i++) {
@@ -5279,7 +5279,7 @@ static int pp_hist_collect(struct mdp_histogram_data *hist,
 				u32 block)
 {
 	int ret = 0;
-	u32 sum;
+	int sum = 0;
 	char __iomem *v_base = NULL;
 	unsigned long flag;
 	struct mdss_data_type *mdata = mdss_mdp_get_mdata();
