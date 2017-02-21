@@ -25,6 +25,9 @@ struct msm_gpu;
 
 enum msm_mmu_domain_type {
 	MSM_SMMU_DOMAIN_UNSECURE,
+	MSM_SMMU_DOMAIN_NRT_UNSECURE,
+	MSM_SMMU_DOMAIN_SECURE,
+	MSM_SMMU_DOMAIN_NRT_SECURE,
 	MSM_SMMU_DOMAIN_MAX,
 };
 
@@ -32,9 +35,8 @@ struct msm_mmu_funcs {
 	int (*attach)(struct msm_mmu *mmu, const char **names, int cnt);
 	void (*detach)(struct msm_mmu *mmu, const char **names, int cnt);
 	int (*map)(struct msm_mmu *mmu, uint32_t iova, struct sg_table *sgt,
-			unsigned len, int prot);
-	int (*unmap)(struct msm_mmu *mmu, uint32_t iova, struct sg_table *sgt,
-			unsigned len);
+			int prot);
+	int (*unmap)(struct msm_mmu *mmu, uint32_t iova, struct sg_table *sgt);
 	int (*map_sg)(struct msm_mmu *mmu, struct sg_table *sgt,
 			enum dma_data_direction dir);
 	void (*unmap_sg)(struct msm_mmu *mmu, struct sg_table *sgt,

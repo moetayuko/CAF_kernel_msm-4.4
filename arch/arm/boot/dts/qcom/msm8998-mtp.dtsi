@@ -1,4 +1,4 @@
-/* Copyright (c) 2016, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2016-2017, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -168,6 +168,19 @@
 		qcom,src-sel = <0>;
 		qcom,master-en = <1>;
 		status = "okay";
+	};
+};
+
+&pmi8998_gpios {
+	/* GPIO 6 for the internal QNOVO discharge FET control signal */
+	gpio@c500 {
+		status = "okay";
+		qcom,mode = <1>;
+		qcom,pull = <5>;
+		qcom,vin-sel = <0>;
+		qcom,src-sel = <2>;
+		qcom,out-strength = <1>;
+		qcom,master-en = <1>;
 	};
 };
 
@@ -364,7 +377,7 @@
 	qcom,panel-supply-entries = <&dsi_panel_pwr_supply>;
 };
 
-&dsi_jdi_1080_vid {
+&dsi_jdi_1080p_video {
 	qcom,mdss-dsi-bl-pmic-control-type = "bl_ctrl_wled";
 	qcom,mdss-dsi-bl-min-level = <1>;
 	qcom,mdss-dsi-bl-max-level = <4095>;
@@ -521,6 +534,10 @@
 	status = "ok";
 };
 
+&snd_9335 {
+	qcom,mbhc-audio-jack-type = "6-pole-jack";
+};
+
 &soc {
 	gpio_keys {
 		compatible = "gpio-keys";
@@ -563,4 +580,8 @@
 		#include "fg-gen3-batterydata-ascent-3450mah.dtsi"
 		#include "fg-gen3-batterydata-demo-6000mah.dtsi"
 	};
+};
+
+&pmi8998_fg {
+	qcom,battery-data = <&mtp_batterydata>;
 };

@@ -1,4 +1,4 @@
-/* Copyright (c) 2010-2016, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2010-2017, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -171,7 +171,11 @@ int pil_do_ramdump(struct pil_desc *desc, void *ramdump_dev)
 	ret = do_elf_ramdump(ramdump_dev, ramdump_segs, count);
 	kfree(ramdump_segs);
 
-	if (!ret && desc->subsys_vmid > 0)
+	if (ret)
+		pil_err(desc, "%s: Ramdump collection failed for subsys %s rc:%d\n",
+				__func__, desc->name, ret);
+
+	if (desc->subsys_vmid > 0)
 		ret = pil_assign_mem_to_subsys(desc, priv->region_start,
 				(priv->region_end - priv->region_start));
 
@@ -579,11 +583,35 @@ static int pil_init_mmap(struct pil_desc *desc, const struct pil_mdt *mdt)
 	return pil_init_entry_addr(priv, mdt);
 }
 
+struct pil_map_fw_info {
+	void *region;
+	struct dma_attrs attrs;
+	phys_addr_t base_addr;
+	struct device *dev;
+};
+
 static void pil_release_mmap(struct pil_desc *desc)
 {
 	struct pil_priv *priv = desc->priv;
 	struct pil_seg *p, *tmp;
 	u64 zero = 0ULL;
+	u8 __iomem *buf;
+
+	struct pil_map_fw_info map_fw_info = {
+		.attrs = desc->attrs,
+		.region = priv->region,
+		.base_addr = priv->region_start,
+		.dev = desc->dev,
+	};
+
+	void *map_data = desc->map_data ? desc->map_data : &map_fw_info;
+
+	/* Clear memory so that unauthorized ELF code is not left behind */
+	buf = desc->map_fw_mem(priv->region_start, (priv->region_end -
+					priv->region_start), map_data);
+	pil_memset_io(buf, 0, (priv->region_end - priv->region_start));
+	desc->unmap_fw_mem(buf, (priv->region_end - priv->region_start),
+								map_data);
 
 	if (priv->info) {
 		__iowrite32_copy(&priv->info->start, &zero,
@@ -598,13 +626,6 @@ static void pil_release_mmap(struct pil_desc *desc)
 }
 
 #define IOMAP_SIZE SZ_1M
-
-struct pil_map_fw_info {
-	void *region;
-	struct dma_attrs attrs;
-	phys_addr_t base_addr;
-	struct device *dev;
-};
 
 static void *map_fw_mem(phys_addr_t paddr, size_t size, void *data)
 {

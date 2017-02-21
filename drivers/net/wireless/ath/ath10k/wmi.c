@@ -2320,9 +2320,9 @@ int ath10k_wmi_event_mgmt_rx(struct ath10k *ar, struct sk_buff *skb)
 	 * of mgmt rx.
 	 */
 	if (channel >= 1 && channel <= 14) {
-		status->band = NL80211_BAND_2GHZ;
+		status->band = IEEE80211_BAND_2GHZ;
 	} else if (channel >= 36 && channel <= 165) {
-		status->band = NL80211_BAND_5GHZ;
+		status->band = IEEE80211_BAND_5GHZ;
 	} else {
 		/* Shouldn't happen unless list of advertised channels to
 		 * mac80211 has been changed.
@@ -2332,7 +2332,7 @@ int ath10k_wmi_event_mgmt_rx(struct ath10k *ar, struct sk_buff *skb)
 		return 0;
 	}
 
-	if (phy_mode == MODE_11B && status->band == NL80211_BAND_5GHZ)
+	if (phy_mode == MODE_11B && status->band == IEEE80211_BAND_5GHZ)
 		ath10k_dbg(ar, ATH10K_DBG_MGMT, "wmi mgmt rx 11b (CCK) on 5GHz\n");
 
 	sband = &ar->mac.sbands[status->band];
@@ -2387,7 +2387,7 @@ static int freq_to_idx(struct ath10k *ar, int freq)
 	struct ieee80211_supported_band *sband;
 	int band, ch, idx = 0;
 
-	for (band = NL80211_BAND_2GHZ; band < NUM_NL80211_BANDS; band++) {
+	for (band = IEEE80211_BAND_2GHZ; band < IEEE80211_NUM_BANDS; band++) {
 		sband = ar->hw->wiphy->bands[band];
 		if (!sband)
 			continue;
@@ -4844,6 +4844,39 @@ static int ath10k_wmi_op_pull_echo_ev(struct ath10k *ar,
 	return 0;
 }
 
+void
+ath10k_generate_mac_addr_auto(struct ath10k *ar, struct wmi_rdy_ev_arg *arg)
+{
+	unsigned int soc_serial_num;
+	u8 bdata_mac_addr[ETH_ALEN];
+	u8 udef_mac_addr[] = {0x00, 0x0A, 0xF5, 0x00, 0x00, 0x00};
+
+	soc_serial_num = socinfo_get_serial_number();
+	if (!soc_serial_num)
+		return;
+
+	if (arg->mac_addr) {
+		ether_addr_copy(ar->base_mac_addr, arg->mac_addr);
+		ether_addr_copy(bdata_mac_addr, arg->mac_addr);
+		soc_serial_num &= 0x00ffffff;
+		bdata_mac_addr[3] = (soc_serial_num >> 16) & 0xff;
+		bdata_mac_addr[4] = (soc_serial_num >> 8) & 0xff;
+		bdata_mac_addr[5] = soc_serial_num & 0xff;
+		ether_addr_copy(ar->mac_addr, bdata_mac_addr);
+	} else {
+		/* If mac address not encoded in wlan board data,
+		 * Auto-generate mac address using device serial
+		 * number and user defined mac address 'udef_mac_addr'.
+		 */
+		udef_mac_addr[3] = (soc_serial_num >> 16) & 0xff;
+		udef_mac_addr[4] = (soc_serial_num >> 8) & 0xff;
+		udef_mac_addr[5] = soc_serial_num & 0xff;
+		ether_addr_copy(ar->base_mac_addr, udef_mac_addr);
+		udef_mac_addr[2] = (soc_serial_num >> 24) & 0xff;
+		ether_addr_copy(ar->mac_addr, udef_mac_addr);
+	}
+}
+
 int ath10k_wmi_event_ready(struct ath10k *ar, struct sk_buff *skb)
 {
 	struct wmi_rdy_ev_arg arg = {};
@@ -4862,7 +4895,11 @@ int ath10k_wmi_event_ready(struct ath10k *ar, struct sk_buff *skb)
 		   arg.mac_addr,
 		   __le32_to_cpu(arg.status));
 
-	ether_addr_copy(ar->mac_addr, arg.mac_addr);
+	if (QCA_REV_WCN3990(ar))
+		ath10k_generate_mac_addr_auto(ar, &arg);
+	else
+		ether_addr_copy(ar->mac_addr, arg.mac_addr);
+
 	complete(&ar->wmi.unified_ready);
 	return 0;
 }

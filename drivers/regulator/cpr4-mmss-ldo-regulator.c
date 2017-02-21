@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2016-2017, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -135,8 +135,14 @@ static const int sdm660_mmss_fuse_ref_volt[SDM660_MMSS_FUSE_CORNERS] = {
 #define SDM660_MMSS_VOLTAGE_FUSE_SIZE	5
 
 #define SDM660_MMSS_CPR_SENSOR_COUNT		11
+#define SDM630_MMSS_CPR_SENSOR_COUNT		7
 
 #define SDM660_MMSS_CPR_CLOCK_RATE		19200000
+
+enum {
+	SDM660_SOC_ID,
+	SDM630_SOC_ID,
+};
 
 /**
  * cpr4_sdm660_mmss_read_fuse_data() - load MMSS specific fuse parameter
@@ -417,6 +423,45 @@ done:
 }
 
 /**
+ * cpr4_sdm660_mmss_adjust_target_quotients() - adjust the target quotients for
+ *		each corner according to device tree values and fuse values
+ * @vreg:		Pointer to the CPR3 regulator
+ *
+ * Return: 0 on success, errno on failure
+ */
+static int cpr4_sdm660_mmss_adjust_target_quotients(struct cpr3_regulator *vreg)
+{
+	struct cpr4_sdm660_mmss_fuses *fuse = vreg->platform_fuses;
+	const struct cpr3_fuse_param (*offset_param)[2];
+	int *volt_offset;
+	int i, fuse_len, rc = 0;
+
+	volt_offset = kcalloc(vreg->fuse_corner_count, sizeof(*volt_offset),
+				GFP_KERNEL);
+	if (!volt_offset)
+		return -ENOMEM;
+
+	offset_param = sdm660_mmss_offset_voltage_param;
+	for (i = 0; i < vreg->fuse_corner_count; i++) {
+		fuse_len = offset_param[i][0].bit_end + 1
+			   - offset_param[i][0].bit_start;
+		volt_offset[i] = cpr3_convert_open_loop_voltage_fuse(
+			0, SDM660_MMSS_OFFSET_FUSE_STEP_VOLT,
+			fuse->offset_voltage[i], fuse_len);
+		if (volt_offset[i])
+			cpr3_info(vreg, "fuse_corner[%d] offset=%7d uV\n",
+				i, volt_offset[i]);
+	}
+
+	rc = cpr3_adjust_target_quotients(vreg, volt_offset);
+	if (rc)
+		cpr3_err(vreg, "adjust target quotients failed, rc=%d\n", rc);
+
+	kfree(volt_offset);
+	return rc;
+}
+
+/**
  * cpr4_mmss_print_settings() - print out MMSS CPR configuration settings into
  *		the kernel log for debugging purposes
  * @vreg:		Pointer to the CPR3 regulator
@@ -489,6 +534,13 @@ static int cpr4_mmss_init_thread(struct cpr3_thread *thread)
 		return rc;
 	}
 
+	rc = cpr4_sdm660_mmss_adjust_target_quotients(vreg);
+	if (rc) {
+		cpr3_err(vreg, "unable to adjust target quotients, rc=%d\n",
+			rc);
+		return rc;
+	}
+
 	rc = cpr4_sdm660_mmss_calculate_open_loop_voltages(vreg);
 	if (rc) {
 		cpr3_err(vreg, "unable to calculate open-loop voltages, rc=%d\n",
@@ -548,7 +600,10 @@ static int cpr4_mmss_init_controller(struct cpr3_controller *ctrl)
 		return rc;
 	}
 
-	ctrl->sensor_count = SDM660_MMSS_CPR_SENSOR_COUNT;
+	if (ctrl->soc_revision == SDM660_SOC_ID)
+		ctrl->sensor_count = SDM660_MMSS_CPR_SENSOR_COUNT;
+	else if (ctrl->soc_revision == SDM630_SOC_ID)
+		ctrl->sensor_count = SDM630_MMSS_CPR_SENSOR_COUNT;
 
 	/*
 	 * MMSS only has one thread (0) so the zeroed array does not need
@@ -586,9 +641,23 @@ static int cpr4_mmss_init_controller(struct cpr3_controller *ctrl)
 	return 0;
 }
 
+/* Data corresponds to the SoC revision */
+static const struct of_device_id cpr4_mmss_regulator_match_table[] = {
+	{
+		.compatible = "qcom,cpr4-sdm660-mmss-ldo-regulator",
+		.data = (void *)(uintptr_t)SDM660_SOC_ID,
+	},
+	{
+		.compatible = "qcom,cpr4-sdm630-mmss-ldo-regulator",
+		.data = (void *)(uintptr_t)SDM630_SOC_ID,
+	},
+	{ },
+};
+
 static int cpr4_mmss_regulator_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
+	const struct of_device_id *match;
 	struct cpr3_controller *ctrl;
 	int rc;
 
@@ -612,6 +681,12 @@ static int cpr4_mmss_regulator_probe(struct platform_device *pdev)
 			rc);
 		return rc;
 	}
+
+	match = of_match_node(cpr4_mmss_regulator_match_table, dev->of_node);
+	if (match)
+		ctrl->soc_revision = (uintptr_t)match->data;
+	else
+		cpr3_err(ctrl, "could not find compatible string match\n");
 
 	rc = cpr3_map_fuse_base(ctrl, pdev);
 	if (rc) {
@@ -684,14 +759,6 @@ static int cpr4_mmss_regulator_resume(struct platform_device *pdev)
 
 	return cpr3_regulator_resume(ctrl);
 }
-
-/* Data corresponds to the SoC revision */
-static const struct of_device_id cpr4_mmss_regulator_match_table[] = {
-	{
-		.compatible = "qcom,cpr4-sdm660-mmss-ldo-regulator",
-		.data = (void *)NULL,
-	},
-};
 
 static struct platform_driver cpr4_mmss_regulator_driver = {
 	.driver		= {

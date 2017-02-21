@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2005-2011 Atheros Communications Inc.
- * Copyright (c) 2011-2013 Qualcomm Atheros, Inc.
+ * Copyright (c) 2011-2013, 2017 Qualcomm Atheros, Inc.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -24,6 +24,7 @@
 #include <linux/pci.h>
 #include <linux/uuid.h>
 #include <linux/time.h>
+#include <soc/qcom/socinfo.h>
 
 #include "htt.h"
 #include "htc.h"
@@ -74,6 +75,7 @@ struct ath10k;
 enum ath10k_bus {
 	ATH10K_BUS_PCI,
 	ATH10K_BUS_AHB,
+	ATH10K_BUS_SNOC,
 };
 
 static inline const char *ath10k_bus_str(enum ath10k_bus bus)
@@ -83,6 +85,8 @@ static inline const char *ath10k_bus_str(enum ath10k_bus bus)
 		return "pci";
 	case ATH10K_BUS_AHB:
 		return "ahb";
+	case ATH10K_BUS_SNOC:
+		return "snoc";
 	}
 
 	return "unknown";
@@ -658,6 +662,10 @@ enum ath10k_tx_pause_reason {
 	ATH10K_TX_PAUSE_MAX,
 };
 
+struct fw_flag {
+	u32 flags;
+};
+
 struct ath10k_fw_file {
 	const struct firmware *firmware;
 
@@ -701,6 +709,7 @@ struct ath10k {
 	struct ieee80211_ops *ops;
 	struct device *dev;
 	u8 mac_addr[ETH_ALEN];
+	u8 base_mac_addr[ETH_ALEN];
 
 	enum ath10k_hw_rev hw_rev;
 	u16 dev_id;
@@ -732,6 +741,8 @@ struct ath10k {
 
 	const struct ath10k_hw_regs *regs;
 	const struct ath10k_hw_values *hw_values;
+	struct ath10k_shadow_reg_value *shadow_reg_value;
+	struct ath10k_shadow_reg_address *shadow_reg_address;
 	struct ath10k_bmi bmi;
 	struct ath10k_wmi wmi;
 	struct ath10k_htc htc;
@@ -778,7 +789,7 @@ struct ath10k {
 	} scan;
 
 	struct {
-		struct ieee80211_supported_band sbands[NUM_NL80211_BANDS];
+		struct ieee80211_supported_band sbands[IEEE80211_NUM_BANDS];
 	} mac;
 
 	/* should never be NULL; needed for regular htt rx */
@@ -912,6 +923,13 @@ struct ath10k {
 	struct net_device napi_dev;
 	struct napi_struct napi;
 
+	void (*bus_write32)(void *ar, u32 offset, u32 value);
+	u32 (*bus_read32)(void *ar, u32 offset);
+	spinlock_t ce_lock; /* lock for CE access */
+	void *ce_states;
+	struct fw_flag *fw_flags;
+	/* set for bmi chip sets */
+	bool is_bmi;
 	/* must be last */
 	u8 drv_priv[0] __aligned(sizeof(void *));
 };

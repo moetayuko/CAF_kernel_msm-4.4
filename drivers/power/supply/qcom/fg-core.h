@@ -71,6 +71,10 @@
 #define KI_COEFF_MAX			62200
 #define KI_COEFF_SOC_LEVELS		3
 
+#define SLOPE_LIMIT_COEFF_MAX		31
+
+#define BATT_THERM_NUM_COEFFS		3
+
 /* Debug flag definitions */
 enum fg_debug_flag {
 	FG_IRQ			= BIT(0), /* Show interrupts */
@@ -156,13 +160,15 @@ enum fg_sram_param_id {
 	FG_SRAM_ESR_TIMER_CHG_INIT,
 	FG_SRAM_SYS_TERM_CURR,
 	FG_SRAM_CHG_TERM_CURR,
-	FG_SRAM_DELTA_SOC_THR,
+	FG_SRAM_DELTA_MSOC_THR,
+	FG_SRAM_DELTA_BSOC_THR,
 	FG_SRAM_RECHARGE_SOC_THR,
 	FG_SRAM_RECHARGE_VBATT_THR,
 	FG_SRAM_KI_COEFF_MED_DISCHG,
 	FG_SRAM_KI_COEFF_HI_DISCHG,
 	FG_SRAM_ESR_TIGHT_FILTER,
 	FG_SRAM_ESR_BROAD_FILTER,
+	FG_SRAM_SLOPE_LIMIT,
 	FG_SRAM_MAX,
 };
 
@@ -201,10 +207,19 @@ enum wa_flags {
 	PMI8998_V1_REV_WA = BIT(0),
 };
 
+enum slope_limit_status {
+	LOW_TEMP_DISCHARGE = 0,
+	LOW_TEMP_CHARGE,
+	HIGH_TEMP_DISCHARGE,
+	HIGH_TEMP_CHARGE,
+	SLOPE_LIMIT_NUM_COEFFS,
+};
+
 /* DT parameters for FG device */
 struct fg_dt_props {
 	bool	force_load_profile;
 	bool	hold_soc_while_full;
+	bool	auto_recharge_soc;
 	int	cutoff_volt_mv;
 	int	empty_volt_mv;
 	int	vbatt_low_thr_mv;
@@ -232,10 +247,13 @@ struct fg_dt_props {
 	int	esr_broad_flt_upct;
 	int	esr_tight_lt_flt_upct;
 	int	esr_broad_lt_flt_upct;
+	int	slope_limit_temp;
 	int	jeita_thresholds[NUM_JEITA_LEVELS];
 	int	ki_coeff_soc[KI_COEFF_SOC_LEVELS];
 	int	ki_coeff_med_dischg[KI_COEFF_SOC_LEVELS];
 	int	ki_coeff_hi_dischg[KI_COEFF_SOC_LEVELS];
+	int	slope_limit_coeffs[SLOPE_LIMIT_NUM_COEFFS];
+	u8	batt_therm_coeffs[BATT_THERM_NUM_COEFFS];
 };
 
 /* parameters from battery profile */
@@ -322,6 +340,7 @@ struct fg_chip {
 	struct mutex		bus_lock;
 	struct mutex		sram_rw_lock;
 	struct mutex		batt_avg_lock;
+	struct mutex		charge_full_lock;
 	u32			batt_soc_base;
 	u32			batt_info_base;
 	u32			mem_if_base;
@@ -335,6 +354,10 @@ struct fg_chip {
 	int			last_soc;
 	int			last_batt_temp;
 	int			health;
+	int			maint_soc;
+	int			delta_soc;
+	int			last_msoc;
+	enum slope_limit_status	slope_limit_sts;
 	bool			profile_available;
 	bool			profile_loaded;
 	bool			battery_missing;
@@ -345,6 +368,8 @@ struct fg_chip {
 	bool			esr_fcc_ctrl_en;
 	bool			soc_reporting_ready;
 	bool			esr_flt_cold_temp_en;
+	bool			bsoc_delta_irq_en;
+	bool			slope_limit_en;
 	struct completion	soc_update;
 	struct completion	soc_ready;
 	struct delayed_work	profile_load_work;
@@ -369,6 +394,7 @@ struct fg_log_buffer {
 /* transaction parameters */
 struct fg_trans {
 	struct fg_chip		*chip;
+	struct mutex		fg_dfs_lock; /* Prevent thread concurrency */
 	struct fg_log_buffer	*log;
 	u32			cnt;
 	u16			addr;

@@ -3855,10 +3855,6 @@ static int mmc_blk_cmdq_issue_rq(struct mmc_queue *mq, struct request *req)
 
 	mmc_get_card(card);
 
-#ifdef CONFIG_MMC_BLOCK_DEFERRED_RESUME
-	if (mmc_bus_needs_resume(card->host))
-		mmc_resume_bus(card->host);
-#endif
 	if (!card->host->cmdq_ctx.active_reqs && mmc_card_doing_bkops(card)) {
 		ret = mmc_cmdq_halt(card->host, true);
 		if (ret)
@@ -4068,7 +4064,7 @@ static struct mmc_blk_data *mmc_blk_alloc_req(struct mmc_card *card,
 	INIT_LIST_HEAD(&md->part);
 	md->usage = 1;
 
-	ret = mmc_init_queue(&md->queue, card, &md->lock, subname, area_type);
+	ret = mmc_init_queue(&md->queue, card, NULL, subname, area_type);
 	if (ret)
 		goto err_putdisk;
 

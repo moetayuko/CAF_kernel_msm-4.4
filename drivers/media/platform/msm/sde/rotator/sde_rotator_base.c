@@ -30,6 +30,7 @@
 #include "sde_rotator_base.h"
 #include "sde_rotator_util.h"
 #include "sde_rotator_trace.h"
+#include "sde_rotator_debug.h"
 
 static inline u64 fudge_factor(u64 val, u32 numer, u32 denom)
 {
@@ -78,8 +79,6 @@ u32 sde_apply_comp_ratio_factor(u32 quota,
 #define RES_UHD		(3840*2160)
 #define RES_WQXGA		(2560*1600)
 #define XIN_HALT_TIMEOUT_US	0x4000
-#define MDSS_MDP_HW_REV_320	0x30020000  /* sdm660 */
-#define MDSS_MDP_HW_REV_330	0x30030000  /* sdm630 */
 
 static int sde_mdp_wait_for_xin_halt(u32 xin_id)
 {
@@ -237,6 +236,8 @@ static u32 get_ot_limit(u32 reg_off, u32 bit_off,
 
 exit:
 	SDEROT_DBG("ot_lim=%d\n", ot_lim);
+	SDEROT_EVTLOG(params->width, params->height, params->fmt, params->fps,
+			ot_lim);
 	return ot_lim;
 }
 
@@ -248,6 +249,7 @@ void sde_mdp_set_ot_limit(struct sde_mdp_set_ot_params *params)
 		params->reg_off_vbif_lim_conf;
 	u32 bit_off_vbif_lim_conf = (params->xin_id % 4) * 8;
 	u32 reg_val;
+	u32 sts;
 	bool forced_on;
 
 	ot_lim = get_ot_limit(
@@ -257,6 +259,16 @@ void sde_mdp_set_ot_limit(struct sde_mdp_set_ot_params *params)
 
 	if (ot_lim == 0)
 		goto exit;
+
+	if (params->rotsts_base && params->rotsts_busy_mask) {
+		sts = readl_relaxed(params->rotsts_base);
+		if (sts & params->rotsts_busy_mask) {
+			SDEROT_ERR(
+				"Rotator still busy, should not modify VBIF\n");
+			SDEROT_EVTLOG_TOUT_HANDLER(
+				"rot", "vbif_dbg_bus", "panic");
+		}
+	}
 
 	trace_rot_perf_set_ot(params->num, params->xin_id, ot_lim);
 
@@ -283,6 +295,7 @@ void sde_mdp_set_ot_limit(struct sde_mdp_set_ot_params *params)
 		force_on_xin_clk(params->bit_off_mdp_clk_ctrl,
 			params->reg_off_mdp_clk_ctrl, false);
 
+	SDEROT_EVTLOG(params->num, params->xin_id, ot_lim);
 exit:
 	return;
 }
@@ -425,6 +438,40 @@ static void sde_mdp_parse_vbif_qos(struct platform_device *pdev,
 	}
 }
 
+static int sde_mdp_parse_vbif_xin_id(struct platform_device *pdev,
+		struct sde_rot_data_type *mdata)
+{
+	int rc = 0;
+	bool default_xin_id = false;
+
+	mdata->nxid = sde_mdp_parse_dt_prop_len(pdev,
+			"qcom,mdss-rot-xin-id");
+	if (!mdata->nxid) {
+		mdata->nxid = 2;
+		default_xin_id = true;
+	}
+	mdata->vbif_xin_id = kzalloc(sizeof(u32) *
+			mdata->nxid, GFP_KERNEL);
+	if (!mdata->vbif_xin_id) {
+		SDEROT_ERR("xin alloc failure\n");
+		return -ENOMEM;
+	}
+	if (default_xin_id) {
+		mdata->vbif_xin_id[XIN_SSPP] = XIN_SSPP;
+		mdata->vbif_xin_id[XIN_WRITEBACK] = XIN_WRITEBACK;
+	} else {
+		rc = sde_mdp_parse_dt_handler(pdev,
+			"qcom,mdss-rot-xin-id", mdata->vbif_xin_id,
+				mdata->nxid);
+		if (rc) {
+			SDEROT_ERR("vbif xin id setting not found\n");
+			return rc;
+		}
+	}
+
+	return 0;
+}
+
 static int sde_mdp_parse_dt_misc(struct platform_device *pdev,
 		struct sde_rot_data_type *mdata)
 {
@@ -450,6 +497,11 @@ static int sde_mdp_parse_dt_misc(struct platform_device *pdev,
 			"Could not read optional property: highest bank bit\n");
 
 	sde_mdp_parse_vbif_qos(pdev, mdata);
+	rc = sde_mdp_parse_vbif_xin_id(pdev, mdata);
+	if (rc) {
+		SDEROT_DBG("vbif xin id dt parse failure\n");
+		return rc;
+	}
 
 	mdata->mdp_base = mdata->sde_io.base + SDE_MDP_OFFSET;
 

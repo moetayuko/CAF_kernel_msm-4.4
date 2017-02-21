@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2005-2011 Atheros Communications Inc.
- * Copyright (c) 2011-2013 Qualcomm Atheros, Inc.
+ * Copyright (c) 2011-2013,2017 Qualcomm Atheros, Inc.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -128,6 +128,10 @@ enum qca9377_chip_id_rev {
 #define QCA4019_HW_1_0_BOARD_DATA_FILE "board.bin"
 #define QCA4019_HW_1_0_PATCH_LOAD_ADDR  0x1234
 
+/* WCN3990 1.0 definitions */
+#define WCN3990_HW_1_0_DEV_VERSION     ATH10K_HW_WCN3990
+#define WCN3990_HW_1_0_FW_DIR          "/etc/firmware"
+
 #define ATH10K_FW_API2_FILE		"firmware-2.bin"
 #define ATH10K_FW_API3_FILE		"firmware-3.bin"
 
@@ -224,12 +228,14 @@ enum ath10k_hw_rev {
 	ATH10K_HW_QCA9377,
 	ATH10K_HW_QCA4019,
 	ATH10K_HW_QCA9887,
+	ATH10K_HW_WCN3990,
 };
 
 struct ath10k_hw_regs {
 	u32 rtc_soc_base_address;
 	u32 rtc_wmac_base_address;
 	u32 soc_core_base_address;
+	u32 soc_global_reset_address;
 	u32 ce_wrapper_base_address;
 	u32 ce0_base_address;
 	u32 ce1_base_address;
@@ -239,6 +245,10 @@ struct ath10k_hw_regs {
 	u32 ce5_base_address;
 	u32 ce6_base_address;
 	u32 ce7_base_address;
+	u32 ce8_base_address;
+	u32 ce9_base_address;
+	u32 ce10_base_address;
+	u32 ce11_base_address;
 	u32 soc_reset_control_si0_rst_mask;
 	u32 soc_reset_control_ce_rst_mask;
 	u32 soc_chip_id_address;
@@ -256,6 +266,9 @@ extern const struct ath10k_hw_regs qca988x_regs;
 extern const struct ath10k_hw_regs qca6174_regs;
 extern const struct ath10k_hw_regs qca99x0_regs;
 extern const struct ath10k_hw_regs qca4019_regs;
+extern const struct ath10k_hw_regs wcn3990_regs;
+
+extern struct fw_flag wcn3990_fw_flags;
 
 struct ath10k_hw_values {
 	u32 rtc_state_val_on;
@@ -271,6 +284,7 @@ extern const struct ath10k_hw_values qca6174_values;
 extern const struct ath10k_hw_values qca99x0_values;
 extern const struct ath10k_hw_values qca9888_values;
 extern const struct ath10k_hw_values qca4019_values;
+extern const struct ath10k_hw_values wcn3990_values;
 
 void ath10k_hw_fill_survey_time(struct ath10k *ar, struct survey_info *survey,
 				u32 cc, u32 rcc, u32 cc_prev, u32 rcc_prev);
@@ -283,6 +297,7 @@ void ath10k_hw_fill_survey_time(struct ath10k *ar, struct survey_info *survey,
 #define QCA_REV_9984(ar) ((ar)->hw_rev == ATH10K_HW_QCA9984)
 #define QCA_REV_9377(ar) ((ar)->hw_rev == ATH10K_HW_QCA9377)
 #define QCA_REV_40XX(ar) ((ar)->hw_rev == ATH10K_HW_QCA4019)
+#define QCA_REV_WCN3990(ar) ((ar)->hw_rev == ATH10K_HW_WCN3990)
 
 /* Known peculiarities:
  *  - raw appears in nwifi decap, raw and nwifi appear in ethernet decap
@@ -422,6 +437,7 @@ struct ath10k_hw_ops {
 
 extern const struct ath10k_hw_ops qca988x_ops;
 extern const struct ath10k_hw_ops qca99x0_ops;
+extern const struct ath10k_hw_ops wcn3990_ops;
 
 static inline int
 ath10k_rx_desc_get_l3_pad_bytes(struct ath10k_hw_params *hw,
@@ -515,6 +531,11 @@ ath10k_rx_desc_get_l3_pad_bytes(struct ath10k_hw_params *hw,
 #define TARGET_TLV_NUM_TIDS			((TARGET_TLV_NUM_PEERS) * 2)
 #define TARGET_TLV_NUM_MSDU_DESC		(1024 + 32)
 #define TARGET_TLV_NUM_WOW_PATTERNS		22
+
+/* Target specific defines for WMI-HL-1.0 firmware */
+#define TARGET_HL_10_TLV_NUM_PEERS		14
+#define TARGET_HL_10_TLV_AST_SKID_LIMIT		6
+#define TARGET_HL_10_TLV_NUM_WDS_ENTRIES	2
 
 /* Diagnostic Window */
 #define CE_DIAG_PIPE	7
@@ -813,5 +834,62 @@ ath10k_rx_desc_get_l3_pad_bytes(struct ath10k_hw_params *hw,
 #define QCA9887_EEPROM_ADDR_LO_LSB		16
 
 #define RTC_STATE_V_GET(x) (((x) & RTC_STATE_V_MASK) >> RTC_STATE_V_LSB)
+
+struct ath10k_shadow_reg_value {
+	u32 shadow_reg_value_0;
+	u32 shadow_reg_value_1;
+	u32 shadow_reg_value_2;
+	u32 shadow_reg_value_3;
+	u32 shadow_reg_value_4;
+	u32 shadow_reg_value_5;
+	u32 shadow_reg_value_6;
+	u32 shadow_reg_value_7;
+	u32 shadow_reg_value_8;
+	u32 shadow_reg_value_9;
+	u32 shadow_reg_value_10;
+	u32 shadow_reg_value_11;
+	u32 shadow_reg_value_12;
+	u32 shadow_reg_value_13;
+	u32 shadow_reg_value_14;
+	u32 shadow_reg_value_15;
+	u32 shadow_reg_value_16;
+	u32 shadow_reg_value_17;
+	u32 shadow_reg_value_18;
+	u32 shadow_reg_value_19;
+	u32 shadow_reg_value_20;
+	u32 shadow_reg_value_21;
+	u32 shadow_reg_value_22;
+	u32 shadow_reg_value_23;
+};
+
+struct ath10k_shadow_reg_address {
+	u32 shadow_reg_address_0;
+	u32 shadow_reg_address_1;
+	u32 shadow_reg_address_2;
+	u32 shadow_reg_address_3;
+	u32 shadow_reg_address_4;
+	u32 shadow_reg_address_5;
+	u32 shadow_reg_address_6;
+	u32 shadow_reg_address_7;
+	u32 shadow_reg_address_8;
+	u32 shadow_reg_address_9;
+	u32 shadow_reg_address_10;
+	u32 shadow_reg_address_11;
+	u32 shadow_reg_address_12;
+	u32 shadow_reg_address_13;
+	u32 shadow_reg_address_14;
+	u32 shadow_reg_address_15;
+	u32 shadow_reg_address_16;
+	u32 shadow_reg_address_17;
+	u32 shadow_reg_address_18;
+	u32 shadow_reg_address_19;
+	u32 shadow_reg_address_20;
+	u32 shadow_reg_address_21;
+	u32 shadow_reg_address_22;
+	u32 shadow_reg_address_23;
+};
+
+extern struct ath10k_shadow_reg_value wcn3990_shadow_reg_value;
+extern struct ath10k_shadow_reg_address wcn3990_shadow_reg_address;
 
 #endif /* _HW_H_ */

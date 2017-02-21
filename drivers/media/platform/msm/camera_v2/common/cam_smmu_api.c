@@ -1,4 +1,4 @@
-/* Copyright (c) 2014-2016, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2014-2017, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -878,6 +878,8 @@ static int cam_smmu_detach_device(int idx)
 
 static int cam_smmu_attach_sec_cpp(int idx)
 {
+	int32_t rc = 0;
+
 	/*
 	 * When switching to secure, detach CPP NS, do scm call
 	 * with CPP SID and no need of attach again, because
@@ -889,8 +891,12 @@ static int cam_smmu_attach_sec_cpp(int idx)
 		return -EINVAL;
 	}
 
-	msm_camera_tz_set_mode(MSM_CAMERA_TZ_MODE_SECURE,
+	rc = msm_camera_tz_set_mode(MSM_CAMERA_TZ_MODE_SECURE,
 		MSM_CAMERA_TZ_HW_BLOCK_CPP);
+	if (rc != 0) {
+		pr_err("fail to set secure mode for cpp, rc %d", rc);
+		return rc;
+	}
 
 	iommu_cb_set.cb_info[idx].state = CAM_SMMU_ATTACH;
 
@@ -899,8 +905,14 @@ static int cam_smmu_attach_sec_cpp(int idx)
 
 static int cam_smmu_detach_sec_cpp(int idx)
 {
-	msm_camera_tz_set_mode(MSM_CAMERA_TZ_MODE_NON_SECURE,
+	int32_t rc = 0;
+
+	rc = msm_camera_tz_set_mode(MSM_CAMERA_TZ_MODE_NON_SECURE,
 		MSM_CAMERA_TZ_HW_BLOCK_CPP);
+	if (rc != 0) {
+		pr_err("fail to switch to non secure mode for cpp, rc %d", rc);
+		return rc;
+	}
 
 	iommu_cb_set.cb_info[idx].state = CAM_SMMU_DETACH;
 
@@ -917,6 +929,8 @@ static int cam_smmu_detach_sec_cpp(int idx)
 
 static int cam_smmu_attach_sec_vfe_ns_stats(int idx)
 {
+	int32_t rc = 0;
+
 	/*
 	 *When switching to secure, for secure pixel and non-secure stats
 	 *localizing scm/attach of non-secure SID's in attach secure
@@ -933,16 +947,26 @@ static int cam_smmu_attach_sec_vfe_ns_stats(int idx)
 		}
 	}
 
-	msm_camera_tz_set_mode(MSM_CAMERA_TZ_MODE_SECURE,
+	rc = msm_camera_tz_set_mode(MSM_CAMERA_TZ_MODE_SECURE,
 		MSM_CAMERA_TZ_HW_BLOCK_ISP);
+	if (rc != 0) {
+		pr_err("fail to set secure mode for vfe, rc %d", rc);
+		return rc;
+	}
 
 	return 0;
 }
 
 static int cam_smmu_detach_sec_vfe_ns_stats(int idx)
 {
-	msm_camera_tz_set_mode(MSM_CAMERA_TZ_MODE_NON_SECURE,
+	int32_t rc = 0;
+
+	rc = msm_camera_tz_set_mode(MSM_CAMERA_TZ_MODE_NON_SECURE,
 		MSM_CAMERA_TZ_HW_BLOCK_ISP);
+	if (rc != 0) {
+		pr_err("fail to switch to non secure mode for vfe, rc %d", rc);
+		return rc;
+	}
 
 	/*
 	 *While exiting from secure mode for secure pixel and non-secure stats,
@@ -1199,6 +1223,25 @@ static enum cam_smmu_buf_state cam_smmu_check_fd_in_list(int idx,
 					size_t *len_ptr)
 {
 	struct cam_dma_buff_info *mapping;
+	list_for_each_entry(mapping,
+			&iommu_cb_set.cb_info[idx].smmu_buf_list,
+			list) {
+		if (mapping->ion_fd == ion_fd) {
+			mapping->ref_count++;
+			*paddr_ptr = mapping->paddr;
+			*len_ptr = mapping->len;
+			return CAM_SMMU_BUFF_EXIST;
+		}
+	}
+	return CAM_SMMU_BUFF_NOT_EXIST;
+}
+
+static enum cam_smmu_buf_state cam_smmu_check_secure_fd_in_list(int idx,
+					int ion_fd, dma_addr_t *paddr_ptr,
+					size_t *len_ptr)
+{
+	struct cam_sec_buff_info *mapping;
+
 	list_for_each_entry(mapping,
 			&iommu_cb_set.cb_info[idx].smmu_buf_list,
 			list) {
@@ -1935,7 +1978,8 @@ int cam_smmu_get_stage2_phy_addr(int handle,
 		goto get_addr_end;
 	}
 
-	buf_state = cam_smmu_check_fd_in_list(idx, ion_fd, paddr_ptr, len_ptr);
+	buf_state = cam_smmu_check_secure_fd_in_list(idx, ion_fd, paddr_ptr,
+			len_ptr);
 	if (buf_state == CAM_SMMU_BUFF_EXIST) {
 		CDBG("ion_fd:%d already in the list, give same addr back",
 				 ion_fd);

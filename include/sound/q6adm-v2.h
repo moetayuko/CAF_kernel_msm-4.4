@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2016, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2017, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -58,9 +58,9 @@ enum {
 struct route_payload {
 	unsigned int copp_idx[MAX_COPPS_PER_PORT];
 	unsigned int port_id[MAX_COPPS_PER_PORT];
-	int app_type;
-	int acdb_dev_id;
-	int sample_rate;
+	int app_type[MAX_COPPS_PER_PORT];
+	int acdb_dev_id[MAX_COPPS_PER_PORT];
+	int sample_rate[MAX_COPPS_PER_PORT];
 	unsigned short num_copps;
 	unsigned int session_id;
 };
@@ -96,7 +96,7 @@ int adm_unmap_rtac_block(uint32_t *mem_map_handle);
 int adm_close(int port, int topology, int perf_mode);
 
 int adm_matrix_map(int path, struct route_payload payload_map,
-		   int perf_mode);
+		   int perf_mode, uint32_t passthr_mode);
 
 int adm_connect_afe_port(int mode, int session_id, int port_id);
 

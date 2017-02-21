@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2005-2011 Atheros Communications Inc.
- * Copyright (c) 2011-2014 Qualcomm Atheros, Inc.
+ * Copyright (c) 2011-2014, 2017 Qualcomm Atheros, Inc.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -22,6 +22,7 @@
 #define WMI_TLV_CMD_UNSUPPORTED 0
 #define WMI_TLV_PDEV_PARAM_UNSUPPORTED 0
 #define WMI_TLV_VDEV_PARAM_UNSUPPORTED 0
+#define WMI_TX_DL_FRM_LEN	64
 
 enum wmi_tlv_grp_id {
 	WMI_TLV_GRP_START = 0x3,
@@ -132,6 +133,7 @@ enum wmi_tlv_cmd_id {
 	WMI_TLV_PRB_REQ_FILTER_RX_CMDID,
 	WMI_TLV_MGMT_TX_CMDID,
 	WMI_TLV_PRB_TMPL_CMDID,
+	WMI_TLV_MGMT_TX_SEND_CMD,
 	WMI_TLV_ADDBA_CLEAR_RESP_CMDID = WMI_TLV_CMD(WMI_TLV_GRP_BA_NEG),
 	WMI_TLV_ADDBA_SEND_CMDID,
 	WMI_TLV_ADDBA_STATUS_CMDID,
@@ -889,6 +891,9 @@ enum wmi_tlv_tag {
 	WMI_TLV_TAG_STRUCT_SAP_OFL_DEL_STA_EVENT,
 	WMI_TLV_TAG_STRUCT_APFIND_CMD_PARAM,
 	WMI_TLV_TAG_STRUCT_APFIND_EVENT_HDR,
+	WMI_TLV_TAG_STRUCT_HL_1_0_SVC_OFFSET = 176,
+
+	WMI_TLV_TAG_STRUCT_MGMT_TX_CMD = 0x1A6,
 
 	WMI_TLV_TAG_MAX
 };
@@ -964,6 +969,50 @@ enum wmi_tlv_service {
 	WMI_TLV_SERVICE_STA_RX_IPA_OFFLOAD_SUPPORT,
 	WMI_TLV_SERVICE_MDNS_OFFLOAD,
 	WMI_TLV_SERVICE_SAP_AUTH_OFFLOAD,
+	WMI_TLV_SERVICE_DUAL_BAND_SIMULTANEOUS_SUPPORT,
+	WMI_TLV_SERVICE_OCB,
+	WMI_TLV_SERVICE_AP_ARPNS_OFFLOAD,
+	WMI_TLV_SERVICE_PER_BAND_CHAINMASK_SUPPORT,
+	WMI_TLV_SERVICE_PACKET_FILTER_OFFLOAD,
+	WMI_TLV_SERVICE_MGMT_TX_HTT,
+	WMI_TLV_SERVICE_MGMT_TX_WMI,
+	WMI_TLV_SERVICE_EXT_MSG,
+	WMI_TLV_SERVICE_MAWC,
+	WMI_TLV_SERVICE_PEER_ASSOC_CONF,
+	WMI_TLV_SERVICE_EGAP,
+	WMI_TLV_SERVICE_STA_PMF_OFFLOAD,
+	WMI_TLV_SERVICE_UNIFIED_WOW_CAPABILITY,
+	WMI_TLV_SERVICE_ENHANCED_PROXY_STA,
+	WMI_TLV_SERVICE_ATF,
+	WMI_TLV_SERVICE_COEX_GPIO,
+	WMI_TLV_SERVICE_AUX_SPECTRAL_INTF,
+	WMI_TLV_SERVICE_AUX_CHAN_LOAD_INTF,
+	WMI_TLV_SERVICE_BSS_CHANNEL_INFO_64,
+	WMI_TLV_SERVICE_ENTERPRISE_MESH,
+	WMI_TLV_SERVICE_RESTRT_CHNL_SUPPORT,
+	WMI_TLV_SERVICE_BPF_OFFLOAD,
+	WMI_TLV_SERVICE_SYNC_DELETE_CMDS,
+	WMI_TLV_SERVICE_SMART_ANTENNA_SW_SUPPORT,
+	WMI_TLV_SERVICE_SMART_ANTENNA_HW_SUPPORT,
+	WMI_TLV_SERVICE_RATECTRL_LIMIT_MAX_MIN_RATES,
+	WMI_TLV_SERVICE_NAN_DATA,
+	WMI_TLV_SERVICE_NAN_RTT,
+	WMI_TLV_SERVICE_11AX,
+	WMI_TLV_SERVICE_DEPRECATED_REPLACE,
+	WMI_TLV_SERVICE_TDLS_CONN_TRACKER_IN_HOST_MODE,
+	WMI_TLV_SERVICE_ENHANCED_MCAST_FILTER,
+	WMI_TLV_SERVICE_PERIODIC_CHAN_STAT_SUPPORT,
+	WMI_TLV_SERVICE_MESH_11S,
+	WMI_TLV_SERVICE_HALF_RATE_QUARTER_RATE_SUPPORT,
+	WMI_TLV_SERVICE_VDEV_RX_FILTER,
+	WMI_TLV_SERVICE_P2P_LISTEN_OFFLOAD_SUPPORT,
+	WMI_TLV_SERVICE_MARK_FIRST_WAKEUP_PACKET,
+	WMI_TLV_SERVICE_MULTIPLE_MCAST_FILTER_SET,
+	WMI_TLV_SERVICE_HOST_MANAGED_RX_REORDER,
+	WMI_TLV_SERVICE_FLASH_RDWR_SUPPORT,
+	WMI_TLV_SERVICE_WLAN_STATS_REPORT,
+	WMI_TLV_SERVICE_TX_MSDU_ID_NEW_PARTITION_SUPPORT,
+	WMI_TLV_SERVICE_DFS_PHYERR_OFFLOAD,
 };
 
 #define WMI_SERVICE_IS_ENABLED(wmi_svc_bmap, svc_id, len) \
@@ -1120,6 +1169,8 @@ wmi_tlv_svc_map(const __le32 *in, unsigned long *out, size_t len)
 	       WMI_SERVICE_MDNS_OFFLOAD, len);
 	SVCMAP(WMI_TLV_SERVICE_SAP_AUTH_OFFLOAD,
 	       WMI_SERVICE_SAP_AUTH_OFFLOAD, len);
+	SVCMAP(WMI_TLV_SERVICE_MGMT_TX_WMI,
+	       WMI_SERVICE_MGMT_TX_WMI, len);
 }
 
 #undef SVCMAP
@@ -1182,6 +1233,14 @@ struct wmi_tlv_svc_rdy_ev {
 	__le32 max_num_scan_chans;
 	__le32 hw_bd_id; /* 0 means hw_bd_info is invalid */
 	struct wmi_tlv_hw_bd_info hw_bd_info[5];
+#ifdef CONFIG_ATH10K_SNOC
+	__le32 max_supported_macs;
+	__le32 wmi_fw_sub_feat_caps;
+	__le32 num_dbs_hw_modes;
+	__le32 txrx_chainmask;
+	__le32 default_dbs_hw_mode_index;
+	__le32 num_msdu_desc;
+#endif
 } __packed;
 
 struct wmi_tlv_rdy_ev {
@@ -1642,4 +1701,25 @@ struct wmi_tlv_tx_pause_ev {
 
 void ath10k_wmi_tlv_attach(struct ath10k *ar);
 
+struct wmi_tlv_mgmt_tx_hdr {
+	__le32 vdev_id;
+	__le32 desc_id;
+	__le32 chanfreq;
+	__le32 paddr_lo;
+	__le32 paddr_hi;
+	__le32 frame_len;
+	__le32 buf_len;
+} __packed;
+
+struct wmi_tlv_mgmt_tx_cmd {
+	struct wmi_tlv_mgmt_tx_hdr hdr;
+	__le16 data_len;
+	__le16 data_tag;
+	u8 buf[0];
+} __packed;
+
+struct wmi_tlv_mac_addr_cmd {
+	__le32 pdev_id;
+	struct wmi_mac_addr mac_addr;
+} __packed;
 #endif
