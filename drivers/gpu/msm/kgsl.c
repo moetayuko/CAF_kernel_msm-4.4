@@ -4379,8 +4379,9 @@ kgsl_get_unmapped_area(struct file *file, unsigned long addr,
 		 val = _get_svm_area(private, entry, addr, len, flags);
 		 if (IS_ERR_VALUE(val))
 			KGSL_MEM_ERR(device,
-				"_get_svm_area: pid %d addr %lx pgoff %lx len %ld failed error %d\n",
-				private->pid, addr, pgoff, len, (int) val);
+				"_get_svm_area: pid %d mmap_base %lx addr %lx pgoff %lx len %ld failed error %d\n",
+				private->pid, current->mm->mmap_base, addr,
+				pgoff, len, (int) val);
 	}
 
 put:
@@ -4752,6 +4753,7 @@ error_close_mmu:
 error_pwrctrl_close:
 	kgsl_pwrctrl_close(device);
 error:
+	kgsl_device_debugfs_close(device);
 	_unregister_device(device);
 	return status;
 }
@@ -4781,6 +4783,7 @@ void kgsl_device_platform_remove(struct kgsl_device *device)
 
 	kgsl_pwrctrl_close(device);
 
+	kgsl_device_debugfs_close(device);
 	_unregister_device(device);
 }
 EXPORT_SYMBOL(kgsl_device_platform_remove);

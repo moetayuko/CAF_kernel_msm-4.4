@@ -45,6 +45,13 @@ struct sde_smmu_domain {
 	unsigned long size;
 };
 
+#ifndef CONFIG_FB_MSM_MDSS
+int mdss_smmu_request_mappings(msm_smmu_handler_t callback)
+{
+	return 0;
+}
+#endif
+
 int sde_smmu_set_dma_direction(int dir)
 {
 	struct sde_rot_data_type *mdata = sde_rot_get_mdata();
@@ -247,6 +254,14 @@ int sde_smmu_attach(struct sde_rot_data_type *mdata)
 					goto err;
 				}
 				sde_smmu->domain_attached = true;
+				if (sde_smmu->domain_reattach) {
+					SDEROT_DBG(
+						"domain[%i] re-attach\n",
+						i);
+					/* remove extra vote */
+					sde_smmu_enable_power(sde_smmu, false);
+					sde_smmu->domain_reattach = false;
+				}
 				SDEROT_DBG("iommu v2 domain[%i] attached\n", i);
 			}
 		} else {
@@ -292,6 +307,12 @@ int sde_smmu_detach(struct sde_rot_data_type *mdata)
 				arm_iommu_detach_device(sde_smmu->dev);
 				SDEROT_DBG("iommu domain[%i] detached\n", i);
 				sde_smmu->domain_attached = false;
+
+				/*
+				 * since we are leaving the clock vote, on
+				 * re-attaching do not vote for clocks
+				 */
+				sde_smmu->domain_reattach = true;
 				}
 			else {
 				sde_smmu_enable_power(sde_smmu, false);
@@ -530,11 +551,18 @@ static int sde_smmu_fault_handler(struct iommu_domain *domain,
 
 	sde_smmu = (struct sde_smmu_client *)token;
 
-	/* trigger rotator panic and dump */
-	SDEROT_ERR("trigger rotator panic and dump, iova=0x%08lx\n", iova);
+	/* trigger rotator dump */
+	SDEROT_ERR("trigger rotator dump, iova=0x%08lx, flags=0x%x\n",
+			iova, flags);
+	SDEROT_ERR("SMMU device:%s", sde_smmu->dev->kobj.name);
 
-	sde_rot_dump_panic();
+	/* generate dump, but no panic */
+	sde_rot_evtlog_tout_handler(false, __func__, "rot", "vbif_dbg_bus");
 
+	/*
+	 * return -ENOSYS to allow smmu driver to dump out useful
+	 * debug info.
+	 */
 	return rc;
 }
 

@@ -57,6 +57,7 @@ enum print_reason {
 #define PL_DELAY_HVDCP_VOTER		"PL_DELAY_HVDCP_VOTER"
 #define CTM_VOTER			"CTM_VOTER"
 #define SW_QC3_VOTER			"SW_QC3_VOTER"
+#define AICL_RERUN_VOTER		"AICL_RERUN_VOTER"
 
 #define VCONN_MAX_ATTEMPTS	3
 #define OTG_MAX_ATTEMPTS	3
@@ -203,6 +204,7 @@ struct smb_iio {
 	struct iio_channel	*usbin_i_chan;
 	struct iio_channel	*usbin_v_chan;
 	struct iio_channel	*batt_i_chan;
+	struct iio_channel	*connector_temp_chan;
 	struct iio_channel	*connector_temp_thr1_chan;
 	struct iio_channel	*connector_temp_thr2_chan;
 	struct iio_channel	*connector_temp_thr3_chan;
