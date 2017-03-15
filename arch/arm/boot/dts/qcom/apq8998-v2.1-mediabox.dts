@@ -36,7 +36,6 @@
 
 &sde_hdmi {
 	qcom,display-type = "primary";
-	qcom,non-pluggable;
 };
 
 &slim_aud {
