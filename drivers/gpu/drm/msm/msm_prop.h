@@ -208,45 +208,6 @@ void msm_property_install_volatile_range(struct msm_property_info *info,
 		uint32_t property_idx);
 
 /**
- * msm_property_install_signed_range - install signed drm range property
- * @info: Pointer to property info container struct
- * @name: Property name
- * @flags: Other property type flags, e.g. DRM_MODE_PROP_IMMUTABLE
- * @min: Min property value
- * @max: Max property value
- * @init: Default Property value
- * @property_idx: Property index
- */
-void msm_property_install_signed_range(struct msm_property_info *info,
-		const char *name,
-		int flags,
-		int64_t min,
-		int64_t max,
-		int64_t init,
-		uint32_t property_idx);
-
-/**
- * msm_property_install_volatile_signed_range - install signed drm range property
- *	This function is similar to msm_property_install_range, but assumes
- *	that the property is meant for holding user pointers or descriptors
- *	that may reference volatile data without having an updated value.
- * @info: Pointer to property info container struct
- * @name: Property name
- * @flags: Other property type flags, e.g. DRM_MODE_PROP_IMMUTABLE
- * @min: Min property value
- * @max: Max property value
- * @init: Default Property value
- * @property_idx: Property index
- */
-void msm_property_install_volatile_signed_range(struct msm_property_info *info,
-		const char *name,
-		int flags,
-		int64_t min,
-		int64_t max,
-		int64_t init,
-		uint32_t property_idx);
-
-/**
  * msm_property_install_rotation - install standard drm rotation property
  * @info: Pointer to property info container struct
  * @supported_rotations: Bitmask of supported rotation values (see
