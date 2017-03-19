@@ -831,17 +831,28 @@ int sde_hdmi_connector_get_modes(struct drm_connector *connector, void *display)
 	SDE_DEBUG("\n");
 
 	if (hdmi_display->non_pluggable) {
-		list_for_each_entry(mode, &hdmi_display->mode_list, head) {
-			m = drm_mode_duplicate(connector->dev, mode);
-			if (!m) {
-				SDE_ERROR("failed to add hdmi mode %dx%d\n",
-					mode->hdisplay, mode->vdisplay);
-				break;
+		if (hdmi_display->num_of_modes) {
+			list_for_each_entry(mode,
+				&hdmi_display->mode_list,
+					head) {
+				m = drm_mode_duplicate(connector->dev, mode);
+				if (!m) {
+					SDE_ERROR("not added hdmi mode %dx%d\n",
+							mode->hdisplay,
+							mode->vdisplay);
+					break;
+				}
+				drm_mode_probed_add(connector, m);
 			}
-			drm_mode_probed_add(connector, m);
+			ret = hdmi_display->num_of_modes;
+		} else {
+			/* non-pluggable case without pre-defined modes */
+			sde_hdmi_free_edid(hdmi_display);
+			sde_hdmi_get_edid(connector, hdmi_display);
+			ret = _sde_hdmi_update_modes(connector, hdmi_display);
 		}
-		ret = hdmi_display->num_of_modes;
 	} else {
+		/* pluggable case assumes EDID is read when HPD */
 		ret = _sde_hdmi_update_modes(connector, display);
 	}
 
