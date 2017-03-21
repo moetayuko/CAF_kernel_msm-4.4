@@ -223,5 +223,7 @@ void sde_hdmi_get_edid(struct drm_connector *connector,
 
 		_sde_hdmi_extract_audio_data_blocks(edid_ctrl);
 		_sde_hdmi_extract_speaker_allocation_data(edid_ctrl);
+	} else {
+		connector->status = connector_status_disconnected;
 	}
 };
