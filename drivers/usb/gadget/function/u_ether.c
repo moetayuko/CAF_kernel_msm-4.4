@@ -743,7 +743,8 @@ static netdev_tx_t eth_start_xmit(struct sk_buff *skb,
 
 	/* throttle highspeed IRQ rate back slightly */
 	if (gadget_is_dualspeed(dev->gadget) &&
-			 (dev->gadget->speed == USB_SPEED_HIGH)) {
+			 (dev->gadget->speed == USB_SPEED_HIGH) &&
+			 !list_empty(&dev->tx_reqs)) {
 		dev->tx_qlen++;
 		if (dev->tx_qlen == (dev->qmult/2)) {
 			req->no_interrupt = 0;
@@ -889,7 +890,7 @@ static int get_ether_addr_str(u8 dev_addr[ETH_ALEN], char *str, int len)
 	if (len < 18)
 		return -EINVAL;
 
-	snprintf(str, len, "%pKM", dev_addr);
+	snprintf(str, len, "%pM", dev_addr);
 	return 18;
 }
 

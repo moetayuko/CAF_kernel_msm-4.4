@@ -665,7 +665,7 @@ static void phy_msg_received(struct usbpd *pd, enum pd_msg_type type,
 
 	rx_msg->type = PD_MSG_HDR_TYPE(header);
 	rx_msg->len = PD_MSG_HDR_COUNT(header);
-	memcpy(&rx_msg->payload, buf, len);
+	memcpy(&rx_msg->payload, buf, min(len, sizeof(rx_msg->payload)));
 
 	spin_lock_irqsave(&pd->rx_lock, flags);
 	list_add_tail(&rx_msg->entry, &pd->rx_q);
@@ -1417,6 +1417,7 @@ static void dr_swap(struct usbpd *pd)
 	}
 
 	pd_phy_update_roles(pd->current_dr, pd->current_pr);
+	dual_role_instance_changed(pd->dual_role);
 }
 
 
@@ -1931,6 +1932,11 @@ static void usbpd_sm(struct work_struct *w)
 
 	case PE_SNK_SELECT_CAPABILITY:
 		if (IS_CTRL(rx_msg, MSG_ACCEPT)) {
+			u32 pdo = pd->received_pdos[pd->requested_pdo - 1];
+			bool same_pps = (pd->selected_pdo == pd->requested_pdo)
+				&& (PD_SRC_PDO_TYPE(pdo) ==
+						PD_SRC_PDO_TYPE_AUGMENTED);
+
 			usbpd_set_state(pd, PE_SNK_TRANSITION_SINK);
 
 			/* prepare for voltage increase/decrease */
@@ -1942,11 +1948,12 @@ static void usbpd_sm(struct work_struct *w)
 					&val);
 
 			/*
-			 * if we are changing voltages, we must lower input
-			 * current to pSnkStdby (2.5W). Calculate it and set
-			 * PD_CURRENT_MAX accordingly.
+			 * if changing voltages (not within the same PPS PDO),
+			 * we must lower input current to pSnkStdby (2.5W).
+			 * Calculate it and set PD_CURRENT_MAX accordingly.
 			 */
-			if (pd->requested_voltage != pd->current_voltage) {
+			if (!same_pps &&
+				pd->requested_voltage != pd->current_voltage) {
 				int mv = max(pd->requested_voltage,
 						pd->current_voltage) / 1000;
 				val.intval = (2500000 / mv) * 1000;
@@ -2650,11 +2657,17 @@ static int usbpd_dr_set_property(struct dual_role_phy_instance *dual_role,
 static int usbpd_dr_prop_writeable(struct dual_role_phy_instance *dual_role,
 		enum dual_role_property prop)
 {
+	struct usbpd *pd = dual_role_get_drvdata(dual_role);
+
 	switch (prop) {
 	case DUAL_ROLE_PROP_MODE:
+		return 1;
 	case DUAL_ROLE_PROP_DR:
 	case DUAL_ROLE_PROP_PR:
-		return 1;
+		if (pd)
+			return pd->current_state == PE_SNK_READY ||
+				pd->current_state == PE_SRC_READY;
+		break;
 	default:
 		break;
 	}

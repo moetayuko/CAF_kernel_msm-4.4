@@ -980,6 +980,7 @@ static int cpp_init_hardware(struct cpp_device *cpp_dev)
 {
 	int rc = 0;
 	uint32_t vbif_version;
+	cpp_dev->turbo_vote = 0;
 
 	rc = msm_camera_regulator_enable(cpp_dev->cpp_vdd,
 		cpp_dev->num_reg, true);
@@ -1430,6 +1431,14 @@ static int cpp_close_node(struct v4l2_subdev *sd, struct v4l2_subdev_fh *fh)
 		pr_err("Invalid close\n");
 		mutex_unlock(&cpp_dev->mutex);
 		return -ENODEV;
+	}
+
+	if (cpp_dev->turbo_vote == 1) {
+		rc = cx_ipeak_update(cpp_dev->cpp_cx_ipeak, false);
+			if (rc)
+				pr_err("cx_ipeak_update failed");
+			else
+				cpp_dev->turbo_vote = 0;
 	}
 
 	cpp_dev->cpp_open_cnt--;
@@ -2116,6 +2125,8 @@ static int msm_cpp_check_buf_type(struct msm_buf_mngr_info *buff_mgr_info,
 			/* More or equal bufs as Input buffer */
 			num_output_bufs = new_frame->batch_info.batch_size;
 		}
+		if (num_output_bufs > MSM_OUTPUT_BUF_CNT)
+			return 0;
 		for (i = 0; i < num_output_bufs; i++) {
 			new_frame->output_buffer_info[i].index =
 				buff_mgr_info->user_buf.buf_idx[i];
@@ -2953,6 +2964,38 @@ static int msm_cpp_validate_input(unsigned int cmd, void *arg,
 	return 0;
 }
 
+unsigned long cpp_cx_ipeak_update(struct cpp_device *cpp_dev,
+	unsigned long clock, int idx)
+{
+	unsigned long clock_rate = 0;
+	int ret = 0;
+
+	if ((clock >= cpp_dev->hw_info.freq_tbl
+		[(cpp_dev->hw_info.freq_tbl_count) - 1]) &&
+		(cpp_dev->turbo_vote == 0)) {
+		ret = cx_ipeak_update(cpp_dev->cpp_cx_ipeak, true);
+		if (ret) {
+			pr_err("cx_ipeak voting failed setting clock below turbo");
+			clock = cpp_dev->hw_info.freq_tbl
+				[(cpp_dev->hw_info.freq_tbl_count) - 2];
+		} else {
+			cpp_dev->turbo_vote = 1;
+		}
+		clock_rate = msm_cpp_set_core_clk(cpp_dev, clock, idx);
+	} else if (clock < cpp_dev->hw_info.freq_tbl
+		[(cpp_dev->hw_info.freq_tbl_count) - 1]) {
+		clock_rate = msm_cpp_set_core_clk(cpp_dev, clock, idx);
+		if (cpp_dev->turbo_vote == 1) {
+			ret = cx_ipeak_update(cpp_dev->cpp_cx_ipeak, false);
+			if (ret)
+				pr_err("cx_ipeak unvoting failed");
+			else
+				cpp_dev->turbo_vote = 0;
+		}
+	}
+	return clock_rate;
+}
+
 long msm_cpp_subdev_ioctl(struct v4l2_subdev *sd,
 			unsigned int cmd, void *arg)
 {
@@ -3335,9 +3378,15 @@ STREAM_BUFF_END:
 				mutex_unlock(&cpp_dev->mutex);
 				return -EINVAL;
 			}
-			clock_rate = msm_cpp_set_core_clk(cpp_dev,
-				clock_settings.clock_rate,
-				msm_cpp_core_clk_idx);
+			if (cpp_dev->cpp_cx_ipeak) {
+				clock_rate = cpp_cx_ipeak_update(cpp_dev,
+					clock_settings.clock_rate,
+					msm_cpp_core_clk_idx);
+			} else {
+				clock_rate = msm_cpp_set_core_clk(cpp_dev,
+					clock_settings.clock_rate,
+					msm_cpp_core_clk_idx);
+			}
 			if (rc < 0) {
 				pr_err("Fail to set core clk\n");
 				mutex_unlock(&cpp_dev->mutex);
@@ -3835,6 +3884,7 @@ static long msm_cpp_subdev_fops_compat_ioctl(struct file *file,
 	struct msm_cpp_frame_info32_t k32_frame_info;
 	struct msm_cpp_frame_info_t k64_frame_info;
 	uint32_t identity_k = 0;
+	bool is_copytouser_req = true;
 	void __user *up = (void __user *)arg;
 
 	if (sd == NULL) {
@@ -3969,9 +4019,8 @@ static long msm_cpp_subdev_fops_compat_ioctl(struct file *file,
 				break;
 			}
 		}
-		if (copy_to_user(
-				(void __user *)kp_ioctl.ioctl_ptr, &inst_info,
-				sizeof(struct msm_cpp_frame_info32_t))) {
+		if (copy_to_user((void __user *)kp_ioctl.ioctl_ptr,
+			&inst_info, sizeof(struct msm_cpp_frame_info32_t))) {
 			mutex_unlock(&cpp_dev->mutex);
 			return -EFAULT;
 		}
@@ -4007,6 +4056,7 @@ static long msm_cpp_subdev_fops_compat_ioctl(struct file *file,
 				  sizeof(struct msm_cpp_stream_buff_info_t);
 			}
 		}
+		is_copytouser_req = false;
 		if (cmd == VIDIOC_MSM_CPP_ENQUEUE_STREAM_BUFF_INFO32)
 			cmd = VIDIOC_MSM_CPP_ENQUEUE_STREAM_BUFF_INFO;
 		else if (cmd == VIDIOC_MSM_CPP_DELETE_STREAM_BUFF32)
@@ -4021,6 +4071,7 @@ static long msm_cpp_subdev_fops_compat_ioctl(struct file *file,
 		get_user(identity_k, identity_u);
 		kp_ioctl.ioctl_ptr = (void *)&identity_k;
 		kp_ioctl.len = sizeof(uint32_t);
+		is_copytouser_req = false;
 		cmd = VIDIOC_MSM_CPP_DEQUEUE_STREAM_BUFF_INFO;
 		break;
 	}
@@ -4079,6 +4130,7 @@ static long msm_cpp_subdev_fops_compat_ioctl(struct file *file,
 					sizeof(struct msm_cpp_clock_settings_t);
 			}
 		}
+		is_copytouser_req = false;
 		cmd = VIDIOC_MSM_CPP_SET_CLOCK;
 		break;
 	}
@@ -4104,6 +4156,7 @@ static long msm_cpp_subdev_fops_compat_ioctl(struct file *file,
 
 		kp_ioctl.ioctl_ptr = (void *)&k_queue_buf;
 		kp_ioctl.len = sizeof(struct msm_pproc_queue_buf_info);
+		is_copytouser_req = false;
 		cmd = VIDIOC_MSM_CPP_QUEUE_BUF;
 		break;
 	}
@@ -4128,6 +4181,8 @@ static long msm_cpp_subdev_fops_compat_ioctl(struct file *file,
 		k64_frame_info.frame_id = k32_frame_info.frame_id;
 
 		kp_ioctl.ioctl_ptr = (void *)&k64_frame_info;
+
+		is_copytouser_req = false;
 		cmd = VIDIOC_MSM_CPP_POP_STREAM_BUFFER;
 		break;
 	}
@@ -4181,13 +4236,16 @@ static long msm_cpp_subdev_fops_compat_ioctl(struct file *file,
 		break;
 	}
 
-	up32_ioctl.id = kp_ioctl.id;
-	up32_ioctl.len = kp_ioctl.len;
-	up32_ioctl.trans_code = kp_ioctl.trans_code;
-	up32_ioctl.ioctl_ptr = ptr_to_compat(kp_ioctl.ioctl_ptr);
+	if (is_copytouser_req) {
+		up32_ioctl.id = kp_ioctl.id;
+		up32_ioctl.len = kp_ioctl.len;
+		up32_ioctl.trans_code = kp_ioctl.trans_code;
+		up32_ioctl.ioctl_ptr = ptr_to_compat(kp_ioctl.ioctl_ptr);
 
-	if (copy_to_user((void __user *)up, &up32_ioctl, sizeof(up32_ioctl)))
-		return -EFAULT;
+		if (copy_to_user((void __user *)up, &up32_ioctl,
+			sizeof(up32_ioctl)))
+			return -EFAULT;
+	}
 
 	return rc;
 }
@@ -4378,6 +4436,15 @@ static int cpp_probe(struct platform_device *pdev)
 			msm_camera_set_clk_flags(cpp_dev->cpp_clk[i],
 				CLKFLAG_NORETAIN_PERIPH);
 		}
+	}
+
+	if (of_find_property(pdev->dev.of_node, "qcom,cpp-cx-ipeak", NULL)) {
+		cpp_dev->cpp_cx_ipeak = cx_ipeak_register(
+			pdev->dev.of_node, "qcom,cpp-cx-ipeak");
+		if (cpp_dev->cpp_cx_ipeak)
+			CPP_DBG("Cx ipeak Registration Successful ");
+		else
+			pr_err("Cx ipeak Registration Unsuccessful");
 	}
 
 	rc = msm_camera_get_reset_info(pdev,

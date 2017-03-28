@@ -24,7 +24,7 @@
 #include <linux/printk.h>
 #include <linux/pm_wakeup.h>
 #include <linux/slab.h>
-#include "pmic-voter.h"
+#include <linux/pmic-voter.h>
 
 #define DRV_MAJOR_VERSION	1
 #define DRV_MINOR_VERSION	0
@@ -35,12 +35,15 @@
 #define PARALLEL_PSY_VOTER		"PARALLEL_PSY_VOTER"
 #define PL_HW_ABSENT_VOTER		"PL_HW_ABSENT_VOTER"
 #define PL_VOTER			"PL_VOTER"
+#define RESTRICT_CHG_VOTER		"RESTRICT_CHG_VOTER"
 
 struct pl_data {
 	int			pl_mode;
 	int			slave_pct;
 	int			taper_pct;
 	int			slave_fcc_ua;
+	int			restricted_current;
+	bool			restricted_charging_enabled;
 	struct votable		*fcc_votable;
 	struct votable		*fv_votable;
 	struct votable		*pl_disable_votable;
@@ -80,6 +83,8 @@ module_param_named(debug_mask, debug_mask, int, S_IRUSR | S_IWUSR);
 enum {
 	VER = 0,
 	SLAVE_PCT,
+	RESTRICT_CHG_ENABLE,
+	RESTRICT_CHG_CURRENT,
 };
 
 /*******
@@ -180,10 +185,78 @@ static ssize_t slave_pct_store(struct class *c, struct class_attribute *attr,
 	return count;
 }
 
+/**********************
+* RESTICTED CHARGIGNG *
+***********************/
+static ssize_t restrict_chg_show(struct class *c, struct class_attribute *attr,
+			char *ubuf)
+{
+	struct pl_data *chip = container_of(c, struct pl_data,
+			qcom_batt_class);
+
+	return snprintf(ubuf, PAGE_SIZE, "%d\n",
+			chip->restricted_charging_enabled);
+}
+
+static ssize_t restrict_chg_store(struct class *c, struct class_attribute *attr,
+			const char *ubuf, size_t count)
+{
+	struct pl_data *chip = container_of(c, struct pl_data,
+			qcom_batt_class);
+	unsigned long val;
+
+	if (kstrtoul(ubuf, 10, &val))
+		return -EINVAL;
+
+	if (chip->restricted_charging_enabled == !!val)
+		goto no_change;
+
+	chip->restricted_charging_enabled = !!val;
+
+	vote(chip->fcc_votable, RESTRICT_CHG_VOTER,
+				chip->restricted_charging_enabled,
+				chip->restricted_current);
+
+no_change:
+	return count;
+}
+
+static ssize_t restrict_cur_show(struct class *c, struct class_attribute *attr,
+			char *ubuf)
+{
+	struct pl_data *chip = container_of(c, struct pl_data,
+			qcom_batt_class);
+
+	return snprintf(ubuf, PAGE_SIZE, "%d\n", chip->restricted_current);
+}
+
+static ssize_t restrict_cur_store(struct class *c, struct class_attribute *attr,
+			const char *ubuf, size_t count)
+{
+	struct pl_data *chip = container_of(c, struct pl_data,
+			qcom_batt_class);
+	unsigned long val;
+
+	if (kstrtoul(ubuf, 10, &val))
+		return -EINVAL;
+
+	chip->restricted_current = val;
+
+	vote(chip->fcc_votable, RESTRICT_CHG_VOTER,
+				chip->restricted_charging_enabled,
+				chip->restricted_current);
+
+	return count;
+}
+
 static struct class_attribute pl_attributes[] = {
 	[VER]			= __ATTR_RO(version),
 	[SLAVE_PCT]		= __ATTR(parallel_pct, S_IRUGO | S_IWUSR,
 					slave_pct_show, slave_pct_store),
+	[RESTRICT_CHG_ENABLE]	= __ATTR(restricted_charging, S_IRUGO | S_IWUSR,
+					restrict_chg_show, restrict_chg_store),
+	[RESTRICT_CHG_CURRENT]	= __ATTR(restricted_current, S_IRUGO | S_IWUSR,
+					restrict_cur_show, restrict_cur_store),
 	__ATTR_NULL,
 };
 
@@ -635,14 +708,16 @@ static void handle_main_charge_type(struct pl_data *chip)
 }
 
 #define MIN_ICL_CHANGE_DELTA_UA		300000
-static void handle_settled_aicl_split(struct pl_data *chip)
+static void handle_settled_icl_change(struct pl_data *chip)
 {
 	union power_supply_propval pval = {0, };
 	int rc;
 
-	if (!get_effective_result(chip->pl_disable_votable)
-		&& (chip->pl_mode == POWER_SUPPLY_PL_USBIN_USBIN
-			|| chip->pl_mode == POWER_SUPPLY_PL_USBIN_USBIN_EXT)) {
+	if (get_effective_result(chip->pl_disable_votable))
+		return;
+
+	if (chip->pl_mode == POWER_SUPPLY_PL_USBIN_USBIN
+			|| chip->pl_mode == POWER_SUPPLY_PL_USBIN_USBIN_EXT) {
 		/*
 		 * call aicl split only when USBIN_USBIN and enabled
 		 * and if aicl changed
@@ -659,6 +734,8 @@ static void handle_settled_aicl_split(struct pl_data *chip)
 		if (abs((chip->main_settled_ua - chip->pl_settled_ua)
 				- pval.intval) > MIN_ICL_CHANGE_DELTA_UA)
 			split_settled(chip);
+	} else {
+		rerun_election(chip->fcc_votable);
 	}
 }
 
@@ -705,7 +782,7 @@ static void status_change_work(struct work_struct *work)
 	is_parallel_available(chip);
 
 	handle_main_charge_type(chip);
-	handle_settled_aicl_split(chip);
+	handle_settled_icl_change(chip);
 	handle_parallel_in_taper(chip);
 }
 
@@ -719,7 +796,8 @@ static int pl_notifier_call(struct notifier_block *nb,
 		return NOTIFY_OK;
 
 	if ((strcmp(psy->desc->name, "parallel") == 0)
-	    || (strcmp(psy->desc->name, "battery") == 0))
+	    || (strcmp(psy->desc->name, "battery") == 0)
+	    || (strcmp(psy->desc->name, "main") == 0))
 		schedule_work(&chip->status_change_work);
 
 	return NOTIFY_OK;
@@ -745,6 +823,7 @@ static int pl_determine_initial_status(struct pl_data *chip)
 	return 0;
 }
 
+#define DEFAULT_RESTRICTED_CURRENT_UA	1000000
 static int pl_init(void)
 {
 	struct pl_data *chip;
@@ -754,6 +833,7 @@ static int pl_init(void)
 	if (!chip)
 		return -ENOMEM;
 	chip->slave_pct = 50;
+	chip->restricted_current = DEFAULT_RESTRICTED_CURRENT_UA;
 
 	chip->pl_ws = wakeup_source_register("qcom-battery");
 	if (!chip->pl_ws)

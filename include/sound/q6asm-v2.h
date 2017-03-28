@@ -211,6 +211,7 @@ struct audio_client {
 	int                    session;
 	app_cb		       cb;
 	atomic_t	       cmd_state;
+	atomic_t	       cmd_state_pp;
 	/* Relative or absolute TS */
 	atomic_t	       time_flag;
 	atomic_t	       nowait_cmd_cnt;
@@ -641,6 +642,14 @@ int q6asm_get_asm_app_type(int session_id);
 int q6asm_send_mtmx_strtr_window(struct audio_client *ac,
 		struct asm_session_mtmx_strtr_param_window_v2_t *window_param,
 		uint32_t param_id);
+
+/* Configure DSP render mode */
+int q6asm_send_mtmx_strtr_render_mode(struct audio_client *ac,
+		uint32_t render_mode);
+
+/* Configure DSP clock recovery mode */
+int q6asm_send_mtmx_strtr_clk_rec_mode(struct audio_client *ac,
+		uint32_t clk_rec_mode);
 
 /* Retrieve the current DSP path delay */
 int q6asm_get_path_delay(struct audio_client *ac);

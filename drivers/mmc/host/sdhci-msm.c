@@ -310,6 +310,9 @@ void sdhci_msm_writel_relaxed(u32 val, struct sdhci_host *host, u32 offset)
 	writel_relaxed(val, base_addr + offset);
 }
 
+/* Timeout value to avoid infinite waiting for pwr_irq */
+#define MSM_PWR_IRQ_TIMEOUT_MS 5000
+
 static const u32 tuning_block_64[] = {
 	0x00FF0FFF, 0xCCC3CCFF, 0xFFCC3CC3, 0xEFFEFFFE,
 	0xDDFFDFFF, 0xFBFFFBFF, 0xFF7FFFBF, 0xEFBDF777,
@@ -2779,8 +2782,10 @@ static void sdhci_msm_check_power_status(struct sdhci_host *host, u32 req_type)
 	 */
 	if (done)
 		init_completion(&msm_host->pwr_irq_completion);
-	else
-		wait_for_completion(&msm_host->pwr_irq_completion);
+	else if (!wait_for_completion_timeout(&msm_host->pwr_irq_completion,
+				msecs_to_jiffies(MSM_PWR_IRQ_TIMEOUT_MS)))
+		__WARN_printf("%s: request(%d) timed out waiting for pwr_irq\n",
+					mmc_hostname(host->mmc), req_type);
 
 	pr_debug("%s: %s: request %d done\n", mmc_hostname(host->mmc),
 			__func__, req_type);
@@ -3284,6 +3289,8 @@ static void sdhci_msm_cmdq_dump_debug_ram(struct sdhci_host *host)
 	/* registers offset changed starting from 4.2.0 */
 	int offset = minor >= SDHCI_MSM_VER_420 ? 0 : 0x48;
 
+	if (cq_host->offset_changed)
+		offset += CQ_V5_VENDOR_CFG;
 	pr_err("---- Debug RAM dump ----\n");
 	pr_err(DRV_NAME ": Debug RAM wrap-around: 0x%08x | Debug RAM overlap: 0x%08x\n",
 	       cmdq_readl(cq_host, CQ_CMD_DBG_RAM_WA + offset),
@@ -4001,6 +4008,7 @@ static unsigned int sdhci_msm_get_current_limit(struct sdhci_host *host)
 static struct sdhci_ops sdhci_msm_ops = {
 	.crypto_engine_cfg = sdhci_msm_ice_cfg,
 	.crypto_engine_cmdq_cfg = sdhci_msm_ice_cmdq_cfg,
+	.crypto_engine_cfg_end = sdhci_msm_ice_cfg_end,
 	.crypto_cfg_reset = sdhci_msm_ice_cfg_reset,
 	.crypto_engine_reset = sdhci_msm_ice_reset,
 	.set_uhs_signaling = sdhci_msm_set_uhs_signaling,

@@ -886,10 +886,11 @@ static int spcom_rx(struct spcom_channel *ch,
 
 	if (timeleft == 0) {
 		pr_err("rx_done timeout [%d] msec expired.\n", timeout_msec);
-		goto exit_err;
+		mutex_unlock(&ch->lock);
+		return -ETIMEDOUT;
 	} else if (ch->rx_abort) {
-		pr_err("rx aborted.\n");
-		goto exit_err;
+		mutex_unlock(&ch->lock);
+		return -ERESTART; /* probably SSR */
 	} else if (ch->actual_rx_size) {
 		pr_debug("actual_rx_size is [%d].\n", ch->actual_rx_size);
 	} else {
@@ -1976,7 +1977,8 @@ static int spcom_handle_read_req_resp(struct spcom_channel *ch,
 	ret = spcom_rx(ch, rx_buf, rx_buf_size, timeout_msec);
 	if (ret < 0) {
 		pr_err("rx error %d.\n", ret);
-		goto exit_err;
+		kfree(rx_buf);
+		return ret;
 	} else {
 		size = ret; /* actual_rx_size */
 	}
@@ -2239,7 +2241,7 @@ static ssize_t spcom_device_write(struct file *filp,
 }
 
 /**
- * spcom_device_read() - handle channel file write() from user space.
+ * spcom_device_read() - handle channel file read() from user space.
  *
  * @filp: file pointer
  *
@@ -2265,12 +2267,28 @@ static ssize_t spcom_device_read(struct file *filp, char __user *user_buff,
 
 	ch = filp->private_data;
 
+	if (ch == NULL) {
+		pr_err("invalid ch pointer, file [%s].\n", name);
+		return -EINVAL;
+	}
+
+	if (!spcom_is_channel_open(ch)) {
+		pr_err("ch is not open, file [%s].\n", name);
+		return -EINVAL;
+	}
+
 	buf = kzalloc(size, GFP_KERNEL);
 	if (buf == NULL)
 		return -ENOMEM;
 
-	actual_size = spcom_handle_read(ch, buf, size);
-	if ((actual_size <= 0) || (actual_size > size)) {
+	ret = spcom_handle_read(ch, buf, size);
+	if (ret < 0) {
+		pr_err("read error [%d].\n", ret);
+		kfree(buf);
+		return ret;
+	}
+	actual_size = ret;
+	if ((actual_size == 0) || (actual_size > size)) {
 		pr_err("invalid actual_size [%d].\n", actual_size);
 		kfree(buf);
 		return -EFAULT;
@@ -2346,6 +2364,10 @@ static unsigned int spcom_device_poll(struct file *filp,
 		done = (spcom_dev->link_state == GLINK_LINK_STATE_UP);
 		break;
 	case SPCOM_POLL_CH_CONNECT:
+		if (ch == NULL) {
+			pr_err("invalid ch pointer, file [%s].\n", name);
+			return -EINVAL;
+		}
 		pr_debug("ch [%s] SPCOM_POLL_CH_CONNECT.\n", name);
 		if (wait) {
 			reinit_completion(&ch->connect);

@@ -141,6 +141,9 @@ struct RGF_ICR {
 #define RGF_USER_USAGE_1		(0x880004)
 #define RGF_USER_USAGE_6		(0x880018)
 	#define BIT_USER_OOB_MODE		BIT(31)
+#define RGF_USER_USAGE_8		(0x880020)
+	#define BIT_USER_PREVENT_DEEP_SLEEP	BIT(0)
+	#define BIT_USER_SUPPORT_T_POWER_ON_0	BIT(1)
 #define RGF_USER_HW_MACHINE_STATE	(0x8801dc)
 	#define HW_MACHINE_BOOT_DONE	(0x3fffffd)
 #define RGF_USER_USER_CPU_0		(0x8801e0)
@@ -693,6 +696,8 @@ struct wil6210_priv {
 	struct wil_halp halp;
 
 	struct wil_ftm_priv ftm;
+	bool tt_data_set;
+	struct wmi_tt_data tt_data;
 
 #ifdef CONFIG_PM
 #ifdef CONFIG_PM_SLEEP
@@ -851,6 +856,8 @@ int wmi_ps_dev_profile_cfg(struct wil6210_priv *wil,
 int wmi_set_mgmt_retry(struct wil6210_priv *wil, u8 retry_short);
 int wmi_get_mgmt_retry(struct wil6210_priv *wil, u8 *retry_short);
 int wmi_new_sta(struct wil6210_priv *wil, const u8 *mac, u8 aid);
+int wmi_set_tt_cfg(struct wil6210_priv *wil, struct wmi_tt_data *tt_data);
+int wmi_get_tt_cfg(struct wil6210_priv *wil, struct wmi_tt_data *tt_data);
 int wil_addba_rx_request(struct wil6210_priv *wil, u8 cidxtid,
 			 u8 dialog_token, __le16 ba_param_set,
 			 __le16 ba_timeout, __le16 ba_seq_ctrl);
@@ -893,6 +900,8 @@ int wil_cfg80211_mgmt_tx(struct wiphy *wiphy, struct wireless_dev *wdev,
 
 int wil6210_debugfs_init(struct wil6210_priv *wil);
 void wil6210_debugfs_remove(struct wil6210_priv *wil);
+int wil6210_sysfs_init(struct wil6210_priv *wil);
+void wil6210_sysfs_remove(struct wil6210_priv *wil);
 int wil_cid_fill_sinfo(struct wil6210_priv *wil, int cid,
 		       struct station_info *sinfo);
 

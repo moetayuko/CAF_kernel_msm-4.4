@@ -47,7 +47,6 @@ enum print_reason {
 #define PD_DISALLOWED_INDIRECT_VOTER	"PD_DISALLOWED_INDIRECT_VOTER"
 #define PD_HARD_RESET_VOTER		"PD_HARD_RESET_VOTER"
 #define VBUS_CC_SHORT_VOTER		"VBUS_CC_SHORT_VOTER"
-#define LEGACY_CABLE_VOTER		"LEGACY_CABLE_VOTER"
 #define PD_INACTIVE_VOTER		"PD_INACTIVE_VOTER"
 #define BOOST_BACK_VOTER		"BOOST_BACK_VOTER"
 #define HVDCP_INDIRECT_VOTER		"HVDCP_INDIRECT_VOTER"
@@ -57,6 +56,8 @@ enum print_reason {
 #define PL_DELAY_HVDCP_VOTER		"PL_DELAY_HVDCP_VOTER"
 #define CTM_VOTER			"CTM_VOTER"
 #define SW_QC3_VOTER			"SW_QC3_VOTER"
+#define AICL_RERUN_VOTER		"AICL_RERUN_VOTER"
+#define LEGACY_UNKNOWN_VOTER		"LEGACY_UNKNOWN_VOTER"
 
 #define VCONN_MAX_ATTEMPTS	3
 #define OTG_MAX_ATTEMPTS	3
@@ -79,6 +80,7 @@ enum {
 	BOOST_BACK_WA			= BIT(1),
 	TYPEC_CC2_REMOVAL_WA_BIT	= BIT(2),
 	QC_AUTH_INTERRUPT_WA_BIT	= BIT(3),
+	OTG_WA				= BIT(4),
 };
 
 enum smb_irq_index {
@@ -203,6 +205,7 @@ struct smb_iio {
 	struct iio_channel	*usbin_i_chan;
 	struct iio_channel	*usbin_v_chan;
 	struct iio_channel	*batt_i_chan;
+	struct iio_channel	*connector_temp_chan;
 	struct iio_channel	*connector_temp_thr1_chan;
 	struct iio_channel	*connector_temp_thr2_chan;
 	struct iio_channel	*connector_temp_thr3_chan;
@@ -303,15 +306,16 @@ struct smb_charger {
 	int			otg_attempts;
 	int			vconn_attempts;
 	int			default_icl_ua;
+	int			otg_cl_ua;
 
 	/* workaround flag */
 	u32			wa_flags;
 	enum cc2_sink_type	cc2_sink_detach_flag;
 	int			boost_current_ua;
+	int			temp_speed_reading_count;
 
 	/* extcon for VBUS / ID notification to USB for uUSB */
 	struct extcon_dev	*extcon;
-	bool			usb_ever_removed;
 
 	int			icl_reduction_ua;
 
@@ -451,6 +455,8 @@ int smblib_get_prop_charger_temp_max(struct smb_charger *chg,
 				union power_supply_propval *val);
 int smblib_get_prop_die_health(struct smb_charger *chg,
 			       union power_supply_propval *val);
+int smblib_get_prop_charge_qnovo_enable(struct smb_charger *chg,
+			       union power_supply_propval *val);
 int smblib_set_prop_pd_current_max(struct smb_charger *chg,
 				const union power_supply_propval *val);
 int smblib_set_prop_usb_current_max(struct smb_charger *chg,
@@ -470,6 +476,8 @@ int smblib_set_prop_pd_in_hard_reset(struct smb_charger *chg,
 int smblib_get_prop_slave_current_now(struct smb_charger *chg,
 				union power_supply_propval *val);
 int smblib_set_prop_ship_mode(struct smb_charger *chg,
+				const union power_supply_propval *val);
+int smblib_set_prop_charge_qnovo_enable(struct smb_charger *chg,
 				const union power_supply_propval *val);
 void smblib_suspend_on_debug_battery(struct smb_charger *chg);
 int smblib_rerun_apsd_if_required(struct smb_charger *chg);

@@ -29,6 +29,7 @@
 
 #include "msm_buf_mgr.h"
 #include "cam_hw_ops.h"
+#include <soc/qcom/cx_ipeak.h>
 
 #define VFE40_8974V1_VERSION 0x10000018
 #define VFE40_8974V2_VERSION 0x1001001A
@@ -161,6 +162,8 @@ struct msm_vfe_irq_ops {
 	void (*config_irq)(struct vfe_device *vfe_dev,
 		uint32_t irq_status0, uint32_t irq_status1,
 		enum msm_isp_irq_operation);
+	void (*preprocess_camif_irq)(struct vfe_device *vfe_dev,
+		uint32_t irq_status0);
 };
 
 struct msm_vfe_axi_ops {
@@ -493,6 +496,7 @@ struct msm_vfe_src_info {
 	struct timeval time_stamp;
 	enum msm_vfe_dual_hw_type dual_hw_type;
 	struct msm_vfe_dual_hw_ms_info dual_hw_ms_info;
+	bool accept_frame;
 };
 
 struct msm_vfe_fetch_engine_info {
@@ -767,6 +771,7 @@ struct vfe_device {
 	size_t num_hvx_clk;
 	size_t num_norm_clk;
 	enum cam_ahb_clk_vote ahb_vote;
+	struct cx_ipeak_client *vfe_cx_ipeak;
 
 	/* Sync variables*/
 	struct completion reset_complete;
@@ -792,6 +797,7 @@ struct vfe_device {
 	struct msm_vfe_error_info error_info;
 	struct msm_vfe_fetch_engine_info fetch_engine_info;
 	enum msm_vfe_hvx_streaming_cmd hvx_cmd;
+	uint8_t cur_hvx_state;
 
 	/* State variables */
 	uint32_t vfe_hw_version;
@@ -805,6 +811,7 @@ struct vfe_device {
 	uint32_t is_split;
 	uint32_t dual_vfe_enable;
 	unsigned long page_fault_addr;
+	uint32_t vfe_hw_limit;
 
 	/* Debug variables */
 	int dump_reg;
@@ -826,6 +833,8 @@ struct vfe_device {
 	uint32_t recovery_irq1_mask;
 	/* Store the buf_idx for pd stats RDI stream */
 	uint8_t pd_buf_idx;
+	/* total bandwidth per vfe */
+	uint64_t total_bandwidth;
 };
 
 struct vfe_parent_device {

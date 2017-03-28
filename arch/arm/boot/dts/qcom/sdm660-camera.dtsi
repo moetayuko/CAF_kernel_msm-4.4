@@ -392,10 +392,12 @@
 			<106 512 0 0>,
 			<106 512 0 0>;
 		qcom,msm-bus-vector-dyn-vote;
+		qcom,cpp-cx-ipeak = <&cx_ipeak_lm 2>;
 		resets = <&clock_mmss CAMSS_MICRO_BCR>;
 		reset-names = "micro_iface_reset";
 		qcom,src-clock-rates = <120000000 256000000 384000000
 					480000000 540000000 576000000>;
+		qcom,micro-reset;
 		qcom,cpp-fw-payload-info {
 			qcom,stripe-base = <790>;
 			qcom,plane-base = <715>;
@@ -530,7 +532,7 @@
 			"camss_vfe_ahb_clk", "camss_vfe_vbif_ahb_clk",
 			"camss_vfe_vbif_axi_clk", "vfe_clk_src",
 			"camss_csi_vfe_clk";
-		qcom,clock-rates = <0 0 0 0 0 0 0 0 0 0 0 256000000 0
+		qcom,clock-rates = <0 0 0 0 0 0 0 0 0 0 0 404000000 0
 					0 0 0 0 0 0 0 0 0 0 0 480000000 0
 					0 0 0 0 0 0 0 0 0 0 0 576000000 0>;
 		status = "ok";
@@ -576,6 +578,7 @@
 			<29 512 0 0>,
 			<29 512 100000000 100000000>;
 		qcom,msm-bus-vector-dyn-vote;
+		qcom,vfe-cx-ipeak = <&cx_ipeak_lm 2>;
 	};
 
 	vfe1: qcom,vfe1@ca14000 {
@@ -610,7 +613,7 @@
 			"camss_vfe_ahb_clk", "camss_vfe_vbif_ahb_clk",
 			"camss_vfe_vbif_axi_clk", "vfe_clk_src",
 			"camss_csi_vfe_clk";
-		qcom,clock-rates = <0 0 0 0 0 0 0 0 0 0 0 256000000 0
+		qcom,clock-rates = <0 0 0 0 0 0 0 0 0 0 0 404000000 0
 					0 0 0 0 0 0 0 0 0 0 0 480000000 0
 					0 0 0 0 0 0 0 0 0 0 0 576000000 0>;
 		status = "ok";
@@ -656,6 +659,7 @@
 			<29 512 0 0>,
 			<29 512 100000000 100000000>;
 		qcom,msm-bus-vector-dyn-vote;
+		qcom,vfe-cx-ipeak = <&cx_ipeak_lm 2>;
 	};
 
 	qcom,vfe {
@@ -757,7 +761,7 @@
 		qcom,msm-bus,num-cases = <2>;
 		qcom,msm-bus,num-paths = <1>;
 		qcom,msm-bus,vectors-KBps = <62 512 0 0>,
-			<62 512 1920000 2880000>;
+			<62 512 1200000 1200000>;
 		status = "ok";
 	};
 
@@ -799,7 +803,7 @@
 		qcom,msm-bus,num-cases = <2>;
 		qcom,msm-bus,num-paths = <1>;
 		qcom,msm-bus,vectors-KBps = <62 512 0 0>,
-			<62 512 1920000 2880000>;
+			<62 512 1200000 1200000>;
 		qcom,max-ds-factor = <128>;
 		status = "ok";
 	};
