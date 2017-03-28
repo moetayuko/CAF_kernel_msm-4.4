@@ -3639,6 +3639,12 @@ STREAM_BUFF_END:
 				break;
 			}
 
+			if (ioctl_ptr->len !=
+				sizeof(struct msm_camera_smmu_attach_type)) {
+				rc = -EINVAL;
+				break;
+			}
+
 			memset(&cpp_attach_info, 0, sizeof(cpp_attach_info));
 			rc = msm_cpp_copy_from_ioctl_ptr(&cpp_attach_info,
 				ioctl_ptr);
