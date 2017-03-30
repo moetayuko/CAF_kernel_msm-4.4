@@ -298,7 +298,11 @@ static void mdss_fb_set_bl_brightness(struct led_classdev *led_cdev,
 	if (!IS_CALIB_MODE_BL(mfd) && (!mfd->ext_bl_ctrl || !value ||
 							!mfd->bl_level)) {
 		mutex_lock(&mfd->bl_lock);
-		mdss_fb_set_backlight(mfd, bl_lvl);
+		if (mfd->bl_extn_enable) {
+			pr_debug("%s, cache BL level %d\n", __func__, bl_lvl);
+			mfd->bl_level_cached = bl_lvl;
+		} else
+			mdss_fb_set_backlight(mfd, bl_lvl);
 		mutex_unlock(&mfd->bl_lock);
 	}
 	mfd->bl_level_usr = bl_lvl;
@@ -912,6 +916,38 @@ static ssize_t mdss_fb_idle_pc_notify(struct device *dev,
 	return scnprintf(buf, PAGE_SIZE, "idle power collapsed\n");
 }
 
+static ssize_t mdss_fb_get_panel_bl_extn(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct fb_info *fbi = dev_get_drvdata(dev);
+	struct msm_fb_data_type *mfd = fbi->par;
+	int ret;
+
+	ret = scnprintf(buf, PAGE_SIZE, "%d", mfd->bl_extn_enable);
+
+	return ret;
+}
+
+static ssize_t mdss_fb_set_panel_bl_extn(struct device *dev,
+	struct device_attribute *attr, const char *buf, size_t count)
+{
+	struct fb_info *fbi = dev_get_drvdata(dev);
+	struct msm_fb_data_type *mfd = fbi->par;
+	int rc = 0;
+	int bl_extn_enable = 0;
+
+	rc = kstrtoint(buf, 10, &bl_extn_enable);
+	if (rc) {
+		pr_err("kstrtoint failed. rc=%d\n", rc);
+		return rc;
+	}
+
+	pr_debug("bl_extn_enable = %d\n", bl_extn_enable);
+	mfd->bl_extn_enable = bl_extn_enable;
+
+	return count;
+}
+
 static DEVICE_ATTR(msm_fb_type, S_IRUGO, mdss_fb_get_type, NULL);
 static DEVICE_ATTR(msm_fb_split, S_IRUGO | S_IWUSR, mdss_fb_show_split,
 					mdss_fb_store_split);
@@ -933,6 +969,8 @@ static DEVICE_ATTR(measured_fps, S_IRUGO | S_IWUSR | S_IWGRP,
 static DEVICE_ATTR(msm_fb_persist_mode, S_IRUGO | S_IWUSR,
 	mdss_fb_get_persist_mode, mdss_fb_change_persist_mode);
 static DEVICE_ATTR(idle_power_collapse, S_IRUGO, mdss_fb_idle_pc_notify, NULL);
+static DEVICE_ATTR(panel_bl_extn, S_IRUGO | S_IWUSR | S_IWGRP,
+	mdss_fb_get_panel_bl_extn, mdss_fb_set_panel_bl_extn);
 
 static struct attribute *mdss_fb_attrs[] = {
 	&dev_attr_msm_fb_type.attr,
@@ -948,6 +986,7 @@ static struct attribute *mdss_fb_attrs[] = {
 	&dev_attr_measured_fps.attr,
 	&dev_attr_msm_fb_persist_mode.attr,
 	&dev_attr_idle_power_collapse.attr,
+	&dev_attr_panel_bl_extn.attr,
 	NULL,
 };
 
@@ -1278,6 +1317,8 @@ static int mdss_fb_probe(struct platform_device *pdev)
 	mfd->unset_bl_level = U32_MAX;
 	mfd->bl_extn_level = -1;
 	mfd->bl_level_usr = backlight_led.brightness;
+	mfd->bl_level_cached = mfd->bl_level;
+	mfd->bl_extn_enable = false;
 
 	mfd->pdev = pdev;
 
