@@ -10,6 +10,8 @@
  * GNU General Public License for more details.
  */
 
+#define pr_fmt(fmt)	"core_ctl: " fmt
+
 #include <linux/init.h>
 #include <linux/notifier.h>
 #include <linux/cpu.h>
@@ -241,22 +243,6 @@ static ssize_t show_is_big_cluster(const struct cluster_data *state, char *buf)
 	return snprintf(buf, PAGE_SIZE, "%u\n", state->is_big_cluster);
 }
 
-static ssize_t show_cpus(const struct cluster_data *state, char *buf)
-{
-	struct cpu_data *c;
-	ssize_t count = 0;
-	unsigned long flags;
-
-	spin_lock_irqsave(&state_lock, flags);
-	list_for_each_entry(c, &state->lru, sib) {
-		count += snprintf(buf + count, PAGE_SIZE - count,
-				  "CPU%u (%s)\n", c->cpu,
-				  cpu_online(c->cpu) ? "Online" : "Offline");
-	}
-	spin_unlock_irqrestore(&state_lock, flags);
-	return count;
-}
-
 static ssize_t show_need_cpus(const struct cluster_data *state, char *buf)
 {
 	return snprintf(buf, PAGE_SIZE, "%u\n", state->need_cpus);
@@ -288,8 +274,8 @@ static ssize_t show_global_state(const struct cluster_data *state, char *buf)
 					"\tOnline: %u\n",
 					cpu_online(c->cpu));
 		count += snprintf(buf + count, PAGE_SIZE - count,
-					"\tActive: %u\n",
-					!cpu_isolated(c->cpu));
+					"\tIsolated: %u\n",
+					cpu_isolated(c->cpu));
 		count += snprintf(buf + count, PAGE_SIZE - count,
 					"\tFirst CPU: %u\n",
 						cluster->first_cpu);
@@ -376,7 +362,6 @@ core_ctl_attr_rw(busy_up_thres);
 core_ctl_attr_rw(busy_down_thres);
 core_ctl_attr_rw(task_thres);
 core_ctl_attr_rw(is_big_cluster);
-core_ctl_attr_ro(cpus);
 core_ctl_attr_ro(need_cpus);
 core_ctl_attr_ro(active_cpus);
 core_ctl_attr_ro(global_state);
@@ -390,7 +375,6 @@ static struct attribute *default_attrs[] = {
 	&busy_down_thres.attr,
 	&task_thres.attr,
 	&is_big_cluster.attr,
-	&cpus.attr,
 	&need_cpus.attr,
 	&active_cpus.attr,
 	&global_state.attr,
@@ -668,6 +652,9 @@ int core_ctl_set_boost(bool boost)
 	unsigned long flags;
 	int ret = 0;
 	bool boost_state_changed = false;
+
+	if (unlikely(!initialized))
+		return 0;
 
 	spin_lock_irqsave(&state_lock, flags);
 	for_each_cluster(cluster, index) {
@@ -947,6 +934,42 @@ static struct notifier_block __refdata cpu_notifier = {
 
 /* ============================ init code ============================== */
 
+static cpumask_var_t core_ctl_disable_cpumask;
+static bool core_ctl_disable_cpumask_present;
+
+static int __init core_ctl_disable_setup(char *str)
+{
+	if (!*str)
+		return -EINVAL;
+
+	alloc_bootmem_cpumask_var(&core_ctl_disable_cpumask);
+
+	if (cpulist_parse(str, core_ctl_disable_cpumask) < 0) {
+		free_bootmem_cpumask_var(core_ctl_disable_cpumask);
+		return -EINVAL;
+	}
+
+	core_ctl_disable_cpumask_present = true;
+	pr_info("disable_cpumask=%*pbl\n",
+			cpumask_pr_args(core_ctl_disable_cpumask));
+
+	return 0;
+}
+early_param("core_ctl_disable_cpumask", core_ctl_disable_setup);
+
+static bool should_skip(const struct cpumask *mask)
+{
+	if (!core_ctl_disable_cpumask_present)
+		return false;
+
+	/*
+	 * We operate on a cluster basis. Disable the core_ctl for
+	 * a cluster, if all of it's cpus are specified in
+	 * core_ctl_disable_cpumask
+	 */
+	return cpumask_subset(mask, core_ctl_disable_cpumask);
+}
+
 static struct cluster_data *find_cluster_by_first_cpu(unsigned int first_cpu)
 {
 	unsigned int i;
@@ -967,6 +990,9 @@ static int cluster_init(const struct cpumask *mask)
 	struct cpu_data *state;
 	unsigned int cpu;
 	struct sched_param param = { .sched_priority = MAX_RT_PRIO-1 };
+
+	if (should_skip(mask))
+		return 0;
 
 	if (find_cluster_by_first_cpu(first_cpu))
 		return 0;
@@ -1067,6 +1093,9 @@ static struct notifier_block cpufreq_gov_nb = {
 static int __init core_ctl_init(void)
 {
 	unsigned int cpu;
+
+	if (should_skip(cpu_possible_mask))
+		return 0;
 
 	core_ctl_check_interval = (rq_avg_period_ms - RQ_AVG_TOLERANCE)
 					* NSEC_PER_MSEC;
