@@ -162,6 +162,8 @@ struct msm_vfe_irq_ops {
 	void (*config_irq)(struct vfe_device *vfe_dev,
 		uint32_t irq_status0, uint32_t irq_status1,
 		enum msm_isp_irq_operation);
+	void (*preprocess_camif_irq)(struct vfe_device *vfe_dev,
+		uint32_t irq_status0);
 };
 
 struct msm_vfe_axi_ops {
@@ -494,6 +496,7 @@ struct msm_vfe_src_info {
 	struct timeval time_stamp;
 	enum msm_vfe_dual_hw_type dual_hw_type;
 	struct msm_vfe_dual_hw_ms_info dual_hw_ms_info;
+	bool accept_frame;
 };
 
 struct msm_vfe_fetch_engine_info {
@@ -798,7 +801,6 @@ struct vfe_device {
 
 	/* State variables */
 	uint32_t vfe_hw_version;
-	int vfe_clk_idx;
 	uint32_t vfe_open_cnt;
 	uint8_t vt_enable;
 	uint32_t vfe_ub_policy;
@@ -815,7 +817,6 @@ struct vfe_device {
 	struct msm_isp_statistics *stats;
 	uint64_t msm_isp_last_overflow_ab;
 	uint64_t msm_isp_last_overflow_ib;
-	uint32_t msm_isp_vfe_clk_rate;
 	struct msm_isp_ub_info *ub_info;
 	uint32_t isp_sof_debug;
 	uint32_t isp_raw0_debug;

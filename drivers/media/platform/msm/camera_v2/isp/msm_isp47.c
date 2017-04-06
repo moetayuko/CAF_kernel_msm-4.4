@@ -281,9 +281,11 @@ int msm_isp47_ahb_clk_cfg(struct vfe_device *vfe_dev,
 
 	vfe_dev->hw_info->vfe_ops.platform_ops.get_clk_rates(vfe_dev,
 							&clk_rates);
-	if (vfe_dev->msm_isp_vfe_clk_rate <= clk_rates.svs_rate)
+	if (vfe_dev->vfe_clk_info[vfe_dev->hw_info->vfe_clk_idx].clk_rate <=
+		clk_rates.svs_rate)
 		src_clk_vote = CAM_AHB_SVS_VOTE;
-	else if (vfe_dev->msm_isp_vfe_clk_rate <= clk_rates.nominal_rate)
+	else if (vfe_dev->vfe_clk_info[vfe_dev->hw_info->vfe_clk_idx].clk_rate
+		<= clk_rates.nominal_rate)
 		src_clk_vote = CAM_AHB_NOMINAL_VOTE;
 	else
 		src_clk_vote = CAM_AHB_TURBO_VOTE;
@@ -683,6 +685,15 @@ void msm_vfe47_process_epoch_irq(struct vfe_device *vfe_dev,
 				vfe_dev, VFE_PIX_0);
 		}
 	}
+}
+
+void msm_isp47_preprocess_camif_irq(struct vfe_device *vfe_dev,
+	uint32_t irq_status0)
+{
+	if (irq_status0 & BIT(1))
+		vfe_dev->axi_data.src_info[VFE_PIX_0].accept_frame = false;
+	if (irq_status0 & BIT(0))
+		vfe_dev->axi_data.src_info[VFE_PIX_0].accept_frame = true;
 }
 
 void msm_vfe47_reg_update(struct vfe_device *vfe_dev,
@@ -2565,17 +2576,19 @@ int msm_vfe47_set_clk_rate(struct vfe_device *vfe_dev, long *rate)
 	long clk_rate, prev_clk_rate;
 
 	clk_rate = clk_round_rate(vfe_dev->vfe_clk[clk_idx], *rate);
-	if (vfe_dev->msm_isp_vfe_clk_rate == clk_rate)
+	if (vfe_dev->vfe_clk_info[clk_idx].clk_rate == clk_rate)
 		return rc;
 
-	prev_clk_rate = vfe_dev->msm_isp_vfe_clk_rate;
-	vfe_dev->msm_isp_vfe_clk_rate = clk_rate;
+	prev_clk_rate =
+		vfe_dev->vfe_clk_info[clk_idx].clk_rate;
+	vfe_dev->vfe_clk_info[clk_idx].clk_rate =
+		clk_rate;
 	/*
 	 * if cx_ipeak is supported vote first so that dsp throttling is
 	 * reduced before we go to turbo
 	 */
 	if ((vfe_dev->vfe_cx_ipeak) &&
-		(vfe_dev->msm_isp_vfe_clk_rate >=
+		(vfe_dev->vfe_clk_info[clk_idx].clk_rate >=
 		vfe_dev->vfe_clk_rates[MSM_VFE_CLK_RATE_NOMINAL]
 		[vfe_dev->hw_info->vfe_clk_idx]) &&
 		prev_clk_rate <
@@ -2598,7 +2611,7 @@ int msm_vfe47_set_clk_rate(struct vfe_device *vfe_dev, long *rate)
 	 * if voting done earlier
 	 */
 	if ((vfe_dev->vfe_cx_ipeak) &&
-		(vfe_dev->msm_isp_vfe_clk_rate <
+		(vfe_dev->vfe_clk_info[clk_idx].clk_rate <
 		vfe_dev->vfe_clk_rates[MSM_VFE_CLK_RATE_NOMINAL]
 		[vfe_dev->hw_info->vfe_clk_idx]) &&
 		prev_clk_rate >=
@@ -2915,6 +2928,7 @@ struct msm_vfe_hardware_info vfe47_hw_info = {
 			.process_epoch_irq = msm_vfe47_process_epoch_irq,
 			.config_irq = msm_vfe47_config_irq,
 			.read_irq_status = msm_vfe47_read_irq_status,
+			.preprocess_camif_irq = msm_isp47_preprocess_camif_irq,
 		},
 		.axi_ops = {
 			.reload_wm = msm_vfe47_axi_reload_wm,
