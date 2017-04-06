@@ -215,7 +215,8 @@ struct cfg80211_event {
 			size_t req_ie_len;
 			size_t resp_ie_len;
 			struct cfg80211_bss *bss;
-			u16 status;
+			int status; /* -1 = failed; 0..65535 = status code */
+			enum nl80211_timeout_reason timeout_reason;
 		} cr;
 		struct {
 			const u8 *req_ie;
@@ -375,8 +376,9 @@ int cfg80211_connect(struct cfg80211_registered_device *rdev,
 void __cfg80211_connect_result(struct net_device *dev, const u8 *bssid,
 			       const u8 *req_ie, size_t req_ie_len,
 			       const u8 *resp_ie, size_t resp_ie_len,
-			       u16 status, bool wextev,
-			       struct cfg80211_bss *bss);
+			       int status, bool wextev,
+			       struct cfg80211_bss *bss,
+			       enum nl80211_timeout_reason timeout_reason);
 void __cfg80211_disconnected(struct net_device *dev, const u8 *ie,
 			     size_t ie_len, u16 reason, bool from_ap);
 int cfg80211_disconnect(struct cfg80211_registered_device *rdev,
@@ -398,6 +400,7 @@ void cfg80211_sme_disassoc(struct wireless_dev *wdev);
 void cfg80211_sme_deauth(struct wireless_dev *wdev);
 void cfg80211_sme_auth_timeout(struct wireless_dev *wdev);
 void cfg80211_sme_assoc_timeout(struct wireless_dev *wdev);
+void cfg80211_sme_abandon_assoc(struct wireless_dev *wdev);
 
 /* internal helpers */
 bool cfg80211_supported_cipher_suite(struct wiphy *wiphy, u32 cipher);

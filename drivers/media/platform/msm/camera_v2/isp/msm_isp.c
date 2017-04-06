@@ -509,6 +509,14 @@ static int vfe_probe(struct platform_device *pdev)
 	for (i = 0; i < (MSM_ISP_STATS_MAX * MAX_VFE); i++)
 		spin_lock_init(&(vfe_common_data.stats_streams[i].lock));
 
+	for (i = 0; i <= MAX_VFE; i++) {
+		INIT_LIST_HEAD(&vfe_common_data.tasklets[i].tasklet_q);
+		tasklet_init(&vfe_common_data.tasklets[i].tasklet,
+			msm_isp_do_tasklet,
+			(unsigned long)(&vfe_common_data.tasklets[i]));
+		spin_lock_init(&vfe_common_data.tasklets[i].tasklet_lock);
+	}
+
 	of_property_read_u32(pdev->dev.of_node,
 		"num_child", &vfe_parent_dev->num_hw_sd);
 
@@ -590,9 +598,9 @@ int vfe_hw_probe(struct platform_device *pdev)
 			(struct msm_vfe_hardware_info *) match_dev->data;
 		/* Cx ipeak support */
 		if (of_find_property(pdev->dev.of_node,
-			"qcom,vfe_cx_ipeak", NULL)) {
+			"qcom,vfe-cx-ipeak", NULL)) {
 			vfe_dev->vfe_cx_ipeak = cx_ipeak_register(
-				pdev->dev.of_node, "qcom,vfe_cx_ipeak");
+				pdev->dev.of_node, "qcom,vfe-cx-ipeak");
 		}
 	} else {
 		vfe_dev->hw_info = (struct msm_vfe_hardware_info *)
@@ -615,10 +623,6 @@ int vfe_hw_probe(struct platform_device *pdev)
 		goto probe_fail3;
 	}
 
-	INIT_LIST_HEAD(&vfe_dev->tasklet_q);
-	tasklet_init(&vfe_dev->vfe_tasklet,
-		msm_isp_do_tasklet, (unsigned long)vfe_dev);
-
 	v4l2_subdev_init(&vfe_dev->subdev.sd, &msm_vfe_v4l2_subdev_ops);
 	vfe_dev->subdev.sd.internal_ops =
 		&msm_vfe_subdev_internal_ops;
@@ -631,7 +635,6 @@ int vfe_hw_probe(struct platform_device *pdev)
 	platform_set_drvdata(pdev, &vfe_dev->subdev.sd);
 	mutex_init(&vfe_dev->realtime_mutex);
 	mutex_init(&vfe_dev->core_mutex);
-	spin_lock_init(&vfe_dev->tasklet_lock);
 	spin_lock_init(&vfe_dev->shared_data_lock);
 	spin_lock_init(&vfe_dev->reg_update_lock);
 	spin_lock_init(&req_history_lock);

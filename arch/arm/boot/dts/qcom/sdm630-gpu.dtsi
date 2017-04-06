@@ -114,8 +114,8 @@
 		vdd-supply = <&gdsc_gpu_gx>;
 
 		/* CPU latency parameter */
-		qcom,pm-qos-active-latency = <349>;
-		qcom,pm-qos-wakeup-latency = <349>;
+		qcom,pm-qos-active-latency = <424>;
+		qcom,pm-qos-wakeup-latency = <424>;
 
 		/* Quirks */
 		qcom,gpu-quirk-dp2clockgating-disable;
@@ -131,6 +131,9 @@
 		qcom,ca-target-pwrlevel = <4>;
 
 		qcom,gpu-speed-bin = <0x41a0 0x1fe00000 21>;
+
+		/* Enable midframe sampling */
+		qcom,enable-midframe-timer;
 
 		/* GPU Mempools */
 		qcom,gpu-mempools {

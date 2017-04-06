@@ -394,7 +394,10 @@
 			#address-cells = <1>;
 			#size-cells = <1>;
 			reg = <0xec00 0x100>;
-			qcom,force-module-reenable;
+			interrupts = <0x3 0xec 0x1 IRQ_TYPE_EDGE_RISING>;
+			interrupt-names = "sc-irq";
+
+			qcom,pmic-revid = <&pm660l_revid>;
 
 			lcdb_ldo_vreg: ldo {
 				label = "ldo";

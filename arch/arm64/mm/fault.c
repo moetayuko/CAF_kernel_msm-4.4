@@ -334,10 +334,6 @@ static int __kprobes do_page_fault(unsigned long addr, unsigned int esr,
 	}
 
 	if (addr < USER_DS && is_permission_fault(esr, regs)) {
-		/* regs->orig_addr_limit may be 0 if we entered from EL0 */
-		if (regs->orig_addr_limit == KERNEL_DS)
-			die("Accessing user space memory with fs=KERNEL_DS", regs, esr);
-
 		if (is_el1_instruction_abort(esr))
 			die("Attempting to execute userspace memory", regs, esr);
 
@@ -461,7 +457,7 @@ no_context:
  * so that, do_mem_abort would not crash kernel thinking TLB conflict not
  * handled.
 */
-#ifdef QCOM_TLB_EL2_HANDLER
+#ifdef CONFIG_QCOM_TLB_EL2_HANDLER
 static int do_tlb_conf_fault(unsigned long addr,
 				unsigned int esr,
 				struct pt_regs *regs)
@@ -532,10 +528,10 @@ static const struct fault_info {
 	{ do_bad,		SIGBUS,  0,		"unknown 17"			},
 	{ do_bad,		SIGBUS,  0,		"unknown 18"			},
 	{ do_bad,		SIGBUS,  0,		"unknown 19"			},
-	{ do_bad,		SIGBUS,  0,		"synchronous external abort (translation table walk)" },
-	{ do_bad,		SIGBUS,  0,		"synchronous external abort (translation table walk)" },
-	{ do_bad,		SIGBUS,  0,		"synchronous external abort (translation table walk)" },
-	{ do_bad,		SIGBUS,  0,		"synchronous external abort (translation table walk)" },
+	{ do_bad,		SIGBUS,  0,		"synchronous abort (translation table walk)" },
+	{ do_bad,		SIGBUS,  0,		"synchronous abort (translation table walk)" },
+	{ do_bad,		SIGBUS,  0,		"synchronous abort (translation table walk)" },
+	{ do_bad,		SIGBUS,  0,		"synchronous abort (translation table walk)" },
 	{ do_bad,		SIGBUS,  0,		"synchronous parity error"	},
 	{ do_bad,		SIGBUS,  0,		"unknown 25"			},
 	{ do_bad,		SIGBUS,  0,		"unknown 26"			},
@@ -560,7 +556,7 @@ static const struct fault_info {
 	{ do_bad,		SIGBUS,  0,		"unknown 45"			},
 	{ do_bad,		SIGBUS,  0,		"unknown 46"			},
 	{ do_bad,		SIGBUS,  0,		"unknown 47"			},
-#ifdef QCOM_TLB_EL2_HANDLER
+#ifdef CONFIG_QCOM_TLB_EL2_HANDLER
 	{ do_tlb_conf_fault,	SIGBUS,  0,		"TLB conflict abort"		},
 #else
 	{ do_bad,		SIGBUS,  0,		"TLB conflict abort"		},

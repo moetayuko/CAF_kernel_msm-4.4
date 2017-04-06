@@ -244,6 +244,9 @@
 		mdss_fb0: qcom,mdss_fb_primary {
 			cell-index = <0>;
 			compatible = "qcom,mdss-fb";
+			qcom,cont-splash-memory {
+				linux,contiguous-region = <&cont_splash_mem>;
+			};
 		};
 
 		mdss_fb1: qcom,mdss_fb_wfd {
@@ -344,6 +347,7 @@
 
 			qcom,timing-db-mode;
 			wqhd-vddio-supply = <&pm660_l11>;
+			vdda-3p3-supply = <&pm660l_l6>;
 			lab-supply = <&lcdb_ldo_vreg>;
 			ibb-supply = <&lcdb_ncp_vreg>;
 			qcom,mdss-mdp = <&mdss_mdp>;
@@ -524,6 +528,19 @@
 
 		qcom,mdss-default-ot-rd-limit = <32>;
 		qcom,mdss-default-ot-wr-limit = <32>;
+
+		qcom,sde-reg-bus {
+			/* Reg Bus Scale Settings */
+			qcom,msm-bus,name = "mdss_rot_reg";
+			qcom,msm-bus,num-cases = <4>;
+			qcom,msm-bus,num-paths = <1>;
+			qcom,msm-bus,active-only;
+			qcom,msm-bus,vectors-KBps =
+				<1 590 0 0>,
+				<1 590 0 76800>,
+				<1 590 0 160000>,
+				<1 590 0 320000>;
+		};
 	};
 };
 
