@@ -685,6 +685,15 @@ struct master_slave_resource_info {
 	struct msm_vfe_sof_info slave_sof_info[MS_NUM_SLAVE_MAX];
 };
 
+struct msm_vfe_irq_debug_info {
+	uint32_t vfe_id;
+	struct msm_isp_timestamp ts;
+	uint32_t core_id;
+	uint32_t irq_status0[MAX_VFE];
+	uint32_t irq_status1[MAX_VFE];
+	uint32_t ping_pong_status[MAX_VFE];
+};
+
 struct msm_vfe_common_dev_data {
 	spinlock_t common_dev_data_lock;
 	struct dual_vfe_resource *dual_vfe_res;

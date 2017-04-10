@@ -1906,7 +1906,6 @@ void msm_isp_process_overflow_irq(
 		ISP_DBG("%s: VFE%d Bus overflow detected: start recovery!\n",
 			__func__, vfe_dev->pdev->id);
 
-		trace_msm_cam_isp_overflow(vfe_dev, *irq_status0, *irq_status1);
 
 		/* maks off irq for current vfe */
 		atomic_cmpxchg(&vfe_dev->error_info.overflow_state,
@@ -2420,7 +2419,8 @@ void msm_isp_dump_irq_debug(void)
 		count = dump_data.first;
 	}
 	for (i = 0; i < count; i++) {
-		trace_msm_cam_ping_pong_debug_dump(dump_data.arr[index]);
+		pr_err("%s: trace_msm_cam_ping_pong_debug_dump()"
+				"need to be re-implemented for ais\n", __func__);
 		index = (index + 1) % MAX_ISP_PING_PONG_DUMP_SIZE;
 	}
 }
@@ -2437,7 +2437,8 @@ void msm_isp_dump_taskelet_debug(void)
 		count = tasklet_data.first;
 	}
 	for (i = 0; i < count; i++) {
-		trace_msm_cam_tasklet_debug_dump(tasklet_data.arr[index]);
+		pr_err("%s: trace_msm_cam_tasklet_debug_dump()"
+				"need to be re-implemented for ais\n", __func__);
 		index = (index + 1) % MAX_ISP_PING_PONG_DUMP_SIZE;
 	}
 }

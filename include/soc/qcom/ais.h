@@ -68,7 +68,7 @@ struct msm_cam_clk_setting {
 };
 
 struct v4l2_subdev_info {
-	enum v4l2_mbus_pixelcode code;
+	u32 code;
 	enum v4l2_colorspace colorspace;
 	uint16_t fmt;
 	uint16_t order;

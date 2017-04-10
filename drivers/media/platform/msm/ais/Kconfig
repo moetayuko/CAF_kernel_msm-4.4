@@ -1,6 +1,6 @@
 menuconfig MSM_AIS
 	bool "QTI MSM Automotive Imaging Subsystem"
-	  depends on ARCH_MSM && VIDEO_V4L2 && I2C
+	  depends on ARCH_QCOM && VIDEO_V4L2 && I2C
 	---help---
 	  Say Y here to enable msm AIS
 
