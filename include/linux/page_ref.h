@@ -174,6 +174,13 @@ static inline void page_ref_unfreeze(struct page *page, int count)
 	VM_BUG_ON_PAGE(page_count(page) != 0, page);
 	VM_BUG_ON(count == 0);
 
+	/*
+	 * Ensure page table updates cannot escape past the end of the
+	 * frozen region. The atomic_cmpxchg in page_ref_freeze() ensures
+	 * the updates cannot be reordered before the frozen region, so
+	 * this smp_mb() provides the other end of the bargain.
+	 */
+	smp_mb();
 	atomic_set(&page->_refcount, count);
 	if (page_ref_tracepoint_active(__tracepoint_page_ref_unfreeze))
 		__page_ref_unfreeze(page, count);
