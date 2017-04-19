@@ -39,7 +39,7 @@
 };
 
 &blsp1_uart3_hs {
-	status = "ok";
+	status = "disabled";
 };
 
 &ufsphy1 {
