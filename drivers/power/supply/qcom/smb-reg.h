@@ -919,6 +919,7 @@ enum {
 
 #define MISC_CFG_REG				(MISC_BASE + 0x52)
 #define GSM_PA_ON_ADJ_SEL_BIT			BIT(0)
+#define STAT_PARALLEL_1400MA_EN_CFG_BIT		BIT(3)
 #define TCC_DEBOUNCE_20MS_BIT			BIT(5)
 
 #define SNARL_BARK_BITE_WD_CFG_REG		(MISC_BASE + 0x53)
@@ -1023,5 +1024,15 @@ enum {
 
 /* CHGR FREQ Peripheral registers */
 #define FREQ_CLK_DIV_REG			(CHGR_FREQ_BASE + 0x50)
+
+/* SMB1355 specific registers */
+#define SMB1355_TEMP_COMP_STATUS_REG		(MISC_BASE + 0x07)
+#define SKIN_TEMP_RST_HOT_BIT			BIT(6)
+#define SKIN_TEMP_UB_HOT_BIT			BIT(5)
+#define SKIN_TEMP_LB_HOT_BIT			BIT(4)
+#define DIE_TEMP_TSD_HOT_BIT			BIT(3)
+#define DIE_TEMP_RST_HOT_BIT			BIT(2)
+#define DIE_TEMP_UB_HOT_BIT			BIT(1)
+#define DIE_TEMP_LB_HOT_BIT			BIT(0)
 
 #endif /* __SMB2_CHARGER_REG_H */
