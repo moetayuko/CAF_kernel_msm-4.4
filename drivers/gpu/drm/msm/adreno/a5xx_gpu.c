@@ -1264,6 +1264,10 @@ static void a530_efuse_bin(struct platform_device *pdev,
 	val = readl_relaxed(base + speed_bin[0]);
 
 	adreno_gpu->speed_bin = (val & speed_bin[1]) >> speed_bin[2];
+
+	/* Only two groups of power levels in dts. */
+	if (adreno_gpu->speed_bin > 1)
+		adreno_gpu->speed_bin = 0;
 }
 
 /* Read target specific configuration from the efuses */
