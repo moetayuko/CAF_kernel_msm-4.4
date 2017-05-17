@@ -522,6 +522,8 @@ static bool arm_smmu_is_slave_side_secure(struct arm_smmu_domain *smmu_domain);
 static bool arm_smmu_has_secure_vmid(struct arm_smmu_domain *smmu_domain);
 static bool arm_smmu_is_iova_coherent(struct iommu_domain *domain,
 					dma_addr_t iova);
+static uint64_t arm_smmu_iova_to_pte(struct iommu_domain *domain,
+					      dma_addr_t iova);
 
 static int arm_smmu_enable_s1_translations(struct arm_smmu_domain *smmu_domain);
 
@@ -2190,8 +2192,8 @@ static int arm_smmu_attach_dynamic(struct iommu_domain *domain,
 				smmu->num_context_banks + 2,
 				MAX_ASID + 1, GFP_KERNEL);
 	if (ret < 0) {
-		dev_err(smmu->dev, "dynamic ASID allocation failed: %d\n",
-			ret);
+		dev_err_ratelimited(smmu->dev,
+			"dynamic ASID allocation failed: %d\n", ret);
 		goto out;
 	}
 
@@ -2533,6 +2535,23 @@ static int arm_smmu_map(struct iommu_domain *domain, unsigned long iova,
 
 	arm_smmu_secure_domain_unlock(smmu_domain);
 
+	return ret;
+}
+
+static uint64_t arm_smmu_iova_to_pte(struct iommu_domain *domain,
+	      dma_addr_t iova)
+{
+	uint64_t ret;
+	unsigned long flags;
+	struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
+	struct io_pgtable_ops *ops = smmu_domain->pgtbl_ops;
+
+	if (!ops)
+		return 0;
+
+	flags = arm_smmu_pgtbl_lock(smmu_domain);
+	ret = ops->iova_to_pte(ops, iova);
+	arm_smmu_pgtbl_unlock(smmu_domain, flags);
 	return ret;
 }
 
@@ -3437,6 +3456,7 @@ static struct iommu_ops arm_smmu_ops = {
 	.enable_config_clocks	= arm_smmu_enable_config_clocks,
 	.disable_config_clocks	= arm_smmu_disable_config_clocks,
 	.is_iova_coherent	= arm_smmu_is_iova_coherent,
+	.iova_to_pte = arm_smmu_iova_to_pte,
 };
 
 static void arm_smmu_device_reset(struct arm_smmu_device *smmu)
