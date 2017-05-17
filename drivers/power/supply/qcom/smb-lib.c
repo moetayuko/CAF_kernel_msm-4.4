@@ -3708,26 +3708,6 @@ static void smblib_handle_typec_debounce_done(struct smb_charger *chg,
 		   smblib_typec_mode_name[pval.intval]);
 }
 
-irqreturn_t smblib_handle_usb_typec_change_for_uusb(struct smb_charger *chg)
-{
-	int rc;
-	u8 stat;
-
-	rc = smblib_read(chg, TYPE_C_STATUS_3_REG, &stat);
-	if (rc < 0) {
-		smblib_err(chg, "Couldn't read TYPE_C_STATUS_3 rc=%d\n", rc);
-		return IRQ_HANDLED;
-	}
-	smblib_dbg(chg, PR_REGISTER, "TYPE_C_STATUS_3 = 0x%02x OTG=%d\n",
-		stat, !!(stat & (U_USB_GND_NOVBUS_BIT | U_USB_GND_BIT)));
-
-	extcon_set_cable_state_(chg->extcon, EXTCON_USB_HOST,
-			!!(stat & (U_USB_GND_NOVBUS_BIT | U_USB_GND_BIT)));
-	power_supply_changed(chg->usb_psy);
-
-	return IRQ_HANDLED;
-}
-
 irqreturn_t smblib_handle_usb_typec_change(int irq, void *data)
 {
 	struct smb_irq_data *irq_data = data;
@@ -3736,8 +3716,15 @@ irqreturn_t smblib_handle_usb_typec_change(int irq, void *data)
 	u8 stat4, stat5;
 	bool debounce_done, sink_attached, legacy_cable;
 
-	if (chg->micro_usb_mode)
-		return smblib_handle_usb_typec_change_for_uusb(chg);
+	if (chg->micro_usb_mode) {
+		cancel_delayed_work_sync(&chg->uusb_otg_work);
+		vote(chg->awake_votable, OTG_DELAY_VOTER, true, 0);
+		smblib_dbg(chg, PR_INTERRUPT, "Scheduling OTG work\n");
+		schedule_delayed_work(&chg->uusb_otg_work,
+				msecs_to_jiffies(chg->otg_delay_ms));
+		return IRQ_HANDLED;
+	}
+
 
 	/* WA - not when PD hard_reset WIP on cc2 in sink mode */
 	if (chg->cc2_sink_detach_flag == CC2_SINK_STD)
@@ -3842,6 +3829,30 @@ irqreturn_t smblib_handle_wdog_bark(int irq, void *data)
 /***************
  * Work Queues *
  ***************/
+static void smblib_uusb_otg_work(struct work_struct *work)
+{
+	struct smb_charger *chg = container_of(work, struct smb_charger,
+						uusb_otg_work.work);
+	int rc;
+	u8 stat;
+	bool otg;
+
+	rc = smblib_read(chg, TYPE_C_STATUS_3_REG, &stat);
+	if (rc < 0) {
+		smblib_err(chg, "Couldn't read TYPE_C_STATUS_3 rc=%d\n", rc);
+		goto out;
+	}
+
+	otg = !!(stat & (U_USB_GND_NOVBUS_BIT | U_USB_GND_BIT));
+	extcon_set_cable_state_(chg->extcon, EXTCON_USB_HOST, otg);
+	smblib_dbg(chg, PR_REGISTER, "TYPE_C_STATUS_3 = 0x%02x OTG=%d\n",
+			stat, otg);
+	power_supply_changed(chg->usb_psy);
+
+out:
+	vote(chg->awake_votable, OTG_DELAY_VOTER, false, 0);
+}
+
 
 static void smblib_hvdcp_detect_work(struct work_struct *work)
 {
@@ -4348,6 +4359,7 @@ int smblib_init(struct smb_charger *chg)
 	INIT_WORK(&chg->vconn_oc_work, smblib_vconn_oc_work);
 	INIT_DELAYED_WORK(&chg->otg_ss_done_work, smblib_otg_ss_done_work);
 	INIT_DELAYED_WORK(&chg->icl_change_work, smblib_icl_change_work);
+	INIT_DELAYED_WORK(&chg->uusb_otg_work, smblib_uusb_otg_work);
 	chg->fake_capacity = -EINVAL;
 
 	switch (chg->mode) {
@@ -4385,6 +4397,7 @@ int smblib_deinit(struct smb_charger *chg)
 {
 	switch (chg->mode) {
 	case PARALLEL_MASTER:
+		cancel_delayed_work_sync(&chg->uusb_otg_work);
 		power_supply_unreg_notifier(&chg->nb);
 		smblib_destroy_votables(chg);
 		break;
