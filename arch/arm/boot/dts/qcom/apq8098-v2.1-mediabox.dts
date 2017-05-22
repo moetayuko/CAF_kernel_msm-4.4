@@ -87,3 +87,6 @@
 &tspp {
 	qcom,lpass-timer-tts = <1>;
 };
+&snd_9335 {
+	qcom,msm-mbhc-hphl-swh = <1>;
+};
