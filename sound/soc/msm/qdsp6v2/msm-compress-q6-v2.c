@@ -178,7 +178,7 @@ struct msm_compr_audio {
 
 const u32 compr_codecs[] = {
 	SND_AUDIOCODEC_AC3, SND_AUDIOCODEC_EAC3, SND_AUDIOCODEC_DTS,
-	SND_AUDIOCODEC_DSD, SND_AUDIOCODEC_TRUEHD, SND_AUDIOCODEC_IEC61937};
+	SND_AUDIOCODEC_DSD, SND_AUDIOCODEC_TRUEHD};
 
 struct query_audio_effect {
 	uint32_t mod_id;
@@ -922,7 +922,7 @@ static void populate_codec_list(struct msm_compr_audio *prtd)
 			COMPR_PLAYBACK_MIN_NUM_FRAGMENTS;
 	prtd->compr_cap.max_fragments =
 			COMPR_PLAYBACK_MAX_NUM_FRAGMENTS;
-	prtd->compr_cap.num_codecs = 17;
+	prtd->compr_cap.num_codecs = 16;
 	prtd->compr_cap.codecs[0] = SND_AUDIOCODEC_MP3;
 	prtd->compr_cap.codecs[1] = SND_AUDIOCODEC_AAC;
 	prtd->compr_cap.codecs[2] = SND_AUDIOCODEC_AC3;
@@ -939,7 +939,6 @@ static void populate_codec_list(struct msm_compr_audio *prtd)
 	prtd->compr_cap.codecs[13] = SND_AUDIOCODEC_DSD;
 	prtd->compr_cap.codecs[14] = SND_AUDIOCODEC_APTX;
 	prtd->compr_cap.codecs[15] = SND_AUDIOCODEC_TRUEHD;
-	prtd->compr_cap.codecs[16] = SND_AUDIOCODEC_IEC61937;
 }
 
 static int msm_compr_send_media_format_block(struct snd_compr_stream *cstream,
@@ -1197,15 +1196,6 @@ static int msm_compr_send_media_format_block(struct snd_compr_stream *cstream,
 	case FORMAT_TRUEHD:
 		pr_debug("SND_AUDIOCODEC_TRUEHD\n");
 		/* no media format block needed */
-		break;
-	case FORMAT_IEC61937:
-		pr_debug("SND_AUDIOCODEC_IEC61937\n");
-		ret = q6asm_media_format_block_iec(prtd->audio_client,
-						   prtd->sample_rate,
-						   prtd->num_channels);
-		if (ret < 0)
-			pr_err("%s: CMD IEC61937 Format block failed ret %d\n",
-				__func__, ret);
 		break;
 	case FORMAT_APTX:
 		pr_debug("SND_AUDIOCODEC_APTX\n");
@@ -1868,11 +1858,8 @@ static int msm_compr_set_params(struct snd_compr_stream *cstream,
 	prtd->sample_rate = prtd->codec_param.codec.sample_rate;
 	pr_debug("%s: sample_rate %d\n", __func__, prtd->sample_rate);
 
-	if ((prtd->codec_param.codec.compr_passthr >= LEGACY_PCM &&
-	    prtd->codec_param.
-	    codec.compr_passthr <= COMPRESSED_PASSTHROUGH_DSD) ||
-	    (prtd->codec_param.
-	    codec.compr_passthr == COMPRESSED_PASSTHROUGH_IEC61937))
+	if (prtd->codec_param.codec.compr_passthr >= LEGACY_PCM &&
+	    prtd->codec_param.codec.compr_passthr <= COMPRESSED_PASSTHROUGH_DSD)
 		prtd->compr_passthr = prtd->codec_param.codec.compr_passthr;
 	else
 		prtd->compr_passthr = LEGACY_PCM;
@@ -1992,12 +1979,6 @@ static int msm_compr_set_params(struct snd_compr_stream *cstream,
 	case SND_AUDIOCODEC_TRUEHD: {
 		pr_debug("%s: SND_AUDIOCODEC_TRUEHD\n", __func__);
 		prtd->codec = FORMAT_TRUEHD;
-		break;
-	}
-
-	case SND_AUDIOCODEC_IEC61937: {
-		pr_debug("%s: SND_AUDIOCODEC_IEC61937\n", __func__);
-		prtd->codec = FORMAT_IEC61937;
 		break;
 	}
 
@@ -2873,7 +2854,6 @@ static int msm_compr_get_codec_caps(struct snd_compr_stream *cstream,
 	case SND_AUDIOCODEC_DTS:
 	case SND_AUDIOCODEC_DSD:
 	case SND_AUDIOCODEC_TRUEHD:
-	case SND_AUDIOCODEC_IEC61937:
 	case SND_AUDIOCODEC_APTX:
 		break;
 	default:
@@ -3311,7 +3291,6 @@ static int msm_compr_send_dec_params(struct snd_compr_stream *cstream,
 	case FORMAT_MP3:
 	case FORMAT_MPEG4_AAC:
 	case FORMAT_TRUEHD:
-	case FORMAT_IEC61937:
 	case FORMAT_APTX:
 		pr_debug("%s: no runtime parameters for codec: %d\n", __func__,
 			 prtd->codec);
@@ -3380,7 +3359,6 @@ static int msm_compr_dec_params_put(struct snd_kcontrol *kcontrol,
 	case FORMAT_DTS:
 	case FORMAT_DSD:
 	case FORMAT_TRUEHD:
-	case FORMAT_IEC61937:
 	case FORMAT_APTX:
 		pr_debug("%s: no runtime parameters for codec: %d\n", __func__,
 			 prtd->codec);
