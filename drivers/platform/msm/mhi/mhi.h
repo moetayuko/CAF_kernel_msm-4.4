@@ -13,7 +13,6 @@
 #ifndef _H_MHI
 #define _H_MHI
 
-#include "mhi_macros.h"
 #include <linux/msm_mhi.h>
 #include <linux/types.h>
 #include <linux/pm.h>
@@ -23,13 +22,214 @@
 #include <linux/interrupt.h>
 #include <linux/sched.h>
 #include <linux/cdev.h>
-#include <linux/msm_pcie.h>
 #include <linux/sched.h>
 #include <linux/irqreturn.h>
 #include <linux/list.h>
 #include <linux/dma-mapping.h>
 
-struct mhi_device_ctxt;
+/* MHI MMIO Register Mapping */
+#define MHIREGLEN (0x0)
+#define MHIREGLEN_MHIREGLEN_MASK 0xffffffff
+#define MHIREGLEN_MHIREGLEN_SHIFT 0x0
+
+#define MHIVER (0x8)
+#define MHIVER_MHIVER_MASK 0xffffffff
+#define MHIVER_MHIVER_SHIFT 0x0
+
+#define MHICFG (0x10)
+#define MHICFG_NHWER_MASK (0xff000000)
+#define MHICFG_NHWER_SHIFT (24)
+#define MHICFG_NER_MASK (0xff0000)
+#define MHICFG_NER_SHIFT (16)
+#define MHICFG_NHWCH_MASK (0xff00)
+#define MHICFG_NHWCH_SHIFT (8)
+#define MHICFG_NCH_MASK (0xff)
+#define MHICFG_NCH_SHIFT (0)
+
+#define CHDBOFF (0x18)
+#define CHDBOFF_CHDBOFF_MASK 0xffffffff
+#define CHDBOFF_CHDBOFF_SHIFT 0x0
+
+#define ERDBOFF (0x20)
+#define ERDBOFF_ERDBOFF_MASK 0xffffffff
+#define ERDBOFF_ERDBOFF_SHIFT 0x0
+
+#define BHIOFF (0x28)
+#define BHIOFF_BHIOFF_MASK 0xffffffff
+#define BHIOFF_BHIOFF_SHIFT 0x0
+
+#define DEBUGOFF (0x30)
+#define DEBUGOFF_DEBUGOFF_MASK 0xffffffff
+#define DEBUGOFF_DEBUGOFF_SHIFT 0x0
+
+#define MHICTRL (0x38)
+#define MHICTRL_MHISTATE_MASK 0x0000FF00
+#define MHICTRL_MHISTATE_SHIFT 0x8
+#define MHICTRL_RESET_MASK 0x2
+#define MHICTRL_RESET_SHIFT 0x1
+
+#define MHISTATUS (0x48)
+#define MHISTATUS_MHISTATE_MASK 0x0000ff00
+#define MHISTATUS_MHISTATE_SHIFT 0x8
+#define MHISTATUS_SYSERR_MASK 0x4
+#define MHISTATUS_SYSERR_SHIFT 0x2
+#define MHISTATUS_READY_MASK 0x1
+#define MHISTATUS_READY_SHIFT 0x0
+
+#define CCABAP_LOWER (0x58)
+#define CCABAP_LOWER_CCABAP_LOWER_MASK 0xffffffff
+#define CCABAP_LOWER_CCABAP_LOWER_SHIFT 0x0
+
+#define CCABAP_HIGHER (0x5c)
+#define CCABAP_HIGHER_CCABAP_HIGHER_MASK 0xffffffff
+#define CCABAP_HIGHER_CCABAP_HIGHER_SHIFT 0x0
+
+#define ECABAP_LOWER (0x60)
+#define ECABAP_LOWER_ECABAP_LOWER_MASK 0xffffffff
+#define ECABAP_LOWER_ECABAP_LOWER_SHIFT 0x0
+
+#define ECABAP_HIGHER (0x64)
+#define ECABAP_HIGHER_ECABAP_HIGHER_MASK 0xffffffff
+#define ECABAP_HIGHER_ECABAP_HIGHER_SHIFT 0x0
+
+#define CRCBAP_LOWER (0x68)
+#define CRCBAP_LOWER_CRCBAP_LOWER_MASK 0xffffffff
+#define CRCBAP_LOWER_CRCBAP_LOWER_SHIFT 0x0
+
+#define CRCBAP_HIGHER (0x6c)
+#define CRCBAP_HIGHER_CRCBAP_HIGHER_MASK 0xffffffff
+#define CRCBAP_HIGHER_CRCBAP_HIGHER_SHIFT 0x0
+
+#define CRDB_LOWER (0x70)
+#define CRDB_LOWER_CRDB_LOWER_MASK 0xffffffff
+#define CRDB_LOWER_CRDB_LOWER_SHIFT 0x0
+
+#define CRDB_HIGHER (0x74)
+#define CRDB_HIGHER_CRDB_HIGHER_MASK 0xffffffff
+#define CRDB_HIGHER_CRDB_HIGHER_SHIFT 0x0
+
+#define MHICTRLBASE_LOWER (0x80)
+#define MHICTRLBASE_LOWER_MHICTRLBASE_LOWER_MASK 0xffffffff
+#define MHICTRLBASE_LOWER_MHICTRLBASE_LOWER_SHIFT 0x0
+
+#define MHICTRLBASE_HIGHER (0x84)
+#define MHICTRLBASE_HIGHER_MHICTRLBASE_HIGHER_MASK 0xffffffff
+#define MHICTRLBASE_HIGHER_MHICTRLBASE_HIGHER_SHIFT 0x0
+
+#define MHICTRLLIMIT_LOWER (0x88)
+#define MHICTRLLIMIT_LOWER_MHICTRLLIMIT_LOWER_MASK 0xffffffff
+#define MHICTRLLIMIT_LOWER_MHICTRLLIMIT_LOWER_SHIFT 0x0
+
+#define MHICTRLLIMIT_HIGHER (0x8c)
+#define MHICTRLLIMIT_HIGHER_MHICTRLLIMIT_HIGHER_MASK 0xffffffff
+#define MHICTRLLIMIT_HIGHER_MHICTRLLIMIT_HIGHER_SHIFT 0x0
+
+#define MHIDATABASE_LOWER (0x98)
+#define MHIDATABASE_LOWER_MHIDATABASE_LOWER_MASK 0xffffffff
+#define MHIDATABASE_LOWER_MHIDATABASE_LOWER_SHIFT 0x0
+
+#define MHIDATABASE_HIGHER (0x9c)
+#define MHIDATABASE_HIGHER_MHIDATABASE_HIGHER_MASK 0xffffffff
+#define MHIDATABASE_HIGHER_MHIDATABASE_HIGHER_SHIFT 0x0
+
+#define MHIDATALIMIT_LOWER (0xa0)
+#define MHIDATALIMIT_LOWER_MHIDATALIMIT_LOWER_MASK 0xffffffff
+#define MHIDATALIMIT_LOWER_MHIDATALIMIT_LOWER_SHIFT 0x0
+
+#define MHIDATALIMIT_HIGHER (0xa4)
+#define MHIDATALIMIT_HIGHER_MHIDATALIMIT_HIGHER_MASK 0xffffffff
+#define MHIDATALIMIT_HIGHER_MHIDATALIMIT_HIGHER_SHIFT 0x0
+
+#define CHDB_LOWER_n(n) (0x0400 + 0x8 * (n))
+#define CHDB_LOWER_n_CHDB_LOWER_MASK 0xffffffff
+#define CHDB_LOWER_n_CHDB_LOWER_SHIFT 0x0
+
+#define CHDB_HIGHER_n(n) (0x0404 + 0x8 * (n))
+#define CHDB_HIGHER_n_CHDB_HIGHER_MASK 0xffffffff
+#define CHDB_HIGHER_n_CHDB_HIGHER_SHIFT 0x0
+
+#define ERDB_LOWER_n(n) (0x0800 + 0x8 * (n))
+#define ERDB_LOWER_n_ERDB_LOWER_MASK 0xffffffff
+#define ERDB_LOWER_n_ERDB_LOWER_SHIFT 0x0
+
+#define ERDB_HIGHER_n(n) (0x0804 + 0x8 * (n))
+#define ERDB_HIGHER_n_ERDB_HIGHER_MASK 0xffffffff
+#define ERDB_HIGHER_n_ERDB_HIGHER_SHIFT 0x0
+
+/* BHI Offsets */
+#define BHI_BHIVERSION_MINOR                               (0x00)
+#define BHI_BHIVERSION_MAJOR                               (0x04)
+#define BHI_IMGADDR_LOW                                    (0x08)
+#define BHI_IMGADDR_HIGH                                   (0x0C)
+#define BHI_IMGSIZE                                        (0x10)
+#define BHI_RSVD1                                          (0x14)
+#define BHI_IMGTXDB                                        (0x18)
+#define BHI_RSVD2                                          (0x1C)
+#define BHI_INTVEC                                         (0x20)
+#define BHI_RSVD3                                          (0x24)
+#define BHI_EXECENV                                        (0x28)
+#define BHI_STATUS                                         (0x2C)
+#define BHI_ERRCODE                                        (0x30)
+#define BHI_ERRDBG1                                        (0x34)
+#define BHI_ERRDBG2                                        (0x38)
+#define BHI_ERRDBG3                                        (0x3C)
+#define BHI_SERIALNUM                                      (0x40)
+#define BHI_SBLANTIROLLVER                                 (0x44)
+#define BHI_NUMSEG                                         (0x48)
+#define BHI_MSMHWID(n)                                     (0x4C + 0x4 * (n))
+#define BHI_OEMPKHASH(n)                                   (0x64 + 0x4 * (n))
+#define BHI_RSVD5                                          (0xC4)
+#define BHI_STATUS_MASK					   (0xC0000000)
+#define BHI_STATUS_SHIFT				   (30)
+#define BHI_STATUS_ERROR				   (3)
+#define BHI_STATUS_SUCCESS				   (2)
+#define BHI_STATUS_RESET				   (0)
+
+/* BHIE Offsets */
+#define BHIE_OFFSET (0x0124) /* BHIE register space offset from BHI base */
+#define BHIE_MSMSOCID_OFFS (BHIE_OFFSET + 0x0000)
+#define BHIE_TXVECADDR_LOW_OFFS (BHIE_OFFSET + 0x002C)
+#define BHIE_TXVECADDR_HIGH_OFFS (BHIE_OFFSET + 0x0030)
+#define BHIE_TXVECSIZE_OFFS (BHIE_OFFSET + 0x0034)
+#define BHIE_TXVECDB_OFFS (BHIE_OFFSET + 0x003C)
+#define BHIE_TXVECDB_SEQNUM_BMSK (0x3FFFFFFF)
+#define BHIE_TXVECDB_SEQNUM_SHFT (0)
+#define BHIE_TXVECSTATUS_OFFS (BHIE_OFFSET + 0x0044)
+#define BHIE_TXVECSTATUS_SEQNUM_BMSK (0x3FFFFFFF)
+#define BHIE_TXVECSTATUS_SEQNUM_SHFT (0)
+#define BHIE_TXVECSTATUS_STATUS_BMSK (0xC0000000)
+#define BHIE_TXVECSTATUS_STATUS_SHFT (30)
+#define BHIE_TXVECSTATUS_STATUS_RESET (0x00)
+#define BHIE_TXVECSTATUS_STATUS_XFER_COMPL (0x02)
+#define BHIE_TXVECSTATUS_STATUS_ERROR (0x03)
+#define BHIE_RXVECADDR_LOW_OFFS (BHIE_OFFSET + 0x0060)
+#define BHIE_RXVECADDR_HIGH_OFFS (BHIE_OFFSET + 0x0064)
+#define BHIE_RXVECSIZE_OFFS (BHIE_OFFSET + 0x0068)
+#define BHIE_RXVECDB_OFFS (BHIE_OFFSET + 0x0070)
+#define BHIE_RXVECDB_SEQNUM_BMSK (0x3FFFFFFF)
+#define BHIE_RXVECDB_SEQNUM_SHFT (0)
+#define BHIE_RXVECSTATUS_OFFS (BHIE_OFFSET + 0x0078)
+#define BHIE_RXVECSTATUS_SEQNUM_BMSK (0x3FFFFFFF)
+#define BHIE_RXVECSTATUS_SEQNUM_SHFT (0)
+#define BHIE_RXVECSTATUS_STATUS_BMSK (0xC0000000)
+#define BHIE_RXVECSTATUS_STATUS_SHFT (30)
+#define BHIE_RXVECSTATUS_STATUS_RESET (0x00)
+#define BHIE_RXVECSTATUS_STATUS_XFER_COMPL (0x02)
+#define BHIE_RXVECSTATUS_STATUS_ERROR (0x03)
+
+#define BHI_MAJOR_VERSION 0x0
+#define BHI_MINOR_VERSION 0x1
+
+#define MSMHWID_NUMDWORDS 6    /* Number of dwords that make the MSMHWID */
+#define OEMPKHASH_NUMDWORDS 24 /* Number of dwords that make the OEM PK HASH */
+
+#define BHI_POLL_SLEEP_TIME_MS 100
+#define FW_POLL_SLEEP_TIME_MS 500
+#define BHI_POLL_TIMEOUT_MS 2000
+#define BHIE_RDDM_DELAY_TIME_US (1000)
+
+#define MHI_DEV_WAKE_DB 127
+
 
 enum MHI_DEBUG_LEVEL {
 	MHI_MSG_RAW = 0x1,
@@ -40,21 +240,6 @@ enum MHI_DEBUG_LEVEL {
 	MHI_MSG_ERROR = 0x20,
 	MHI_MSG_CRITICAL = 0x40,
 	MHI_MSG_reserved = 0x80000000
-};
-
-struct pcie_core_info {
-	u32 dev_id;
-	u32 manufact_id;
-	u32 mhi_ver;
-	void __iomem *bar0_base;
-	void __iomem *bar0_end;
-	u32 irq_base;
-	u32 max_nr_msis;
-	u32 domain;
-	u32 bus;
-	u32 slot;
-	struct pci_saved_state *pcie_state;
-	bool pci_master;
 };
 
 struct firmware_info {
@@ -78,30 +263,6 @@ struct bhie_vec_table {
 	struct bhi_vec_entry *bhi_vec_entry;
 	unsigned segment_count;
 	u32 sequence; /* sequence to indicate new xfer */
-};
-
-struct bhi_ctxt_t {
-	void __iomem *bhi_base;
-	dev_t bhi_dev;
-	struct cdev cdev;
-	struct device *dev;
-	u32 alignment;
-	u32 poll_timeout;
-	/* BHI/E vector table */
-	bool manage_boot; /* fw download done by MHI host */
-	bool support_rddm;
-	struct work_struct fw_load_work;
-	struct firmware_info firmware_info;
-	struct bhie_vec_table fw_table;
-	struct bhie_vec_table rddm_table;
-	size_t rddm_size;
-};
-
-enum MHI_CHAN_DIR {
-	MHI_INVALID = 0x0,
-	MHI_OUT = 0x1,
-	MHI_IN = 0x2,
-	MHI_CHAN_TYPE_reserved = 0x80000000
 };
 
 enum MHI_RING_CLASS {
@@ -146,6 +307,7 @@ enum MHI_STATE {
 	MHI_STATE_M3 = 0x5,
 	MHI_STATE_BHI  = 0x7,
 	MHI_STATE_SYS_ERR  = 0xFF,
+	MHI_STATE_INVALID,
 	MHI_STATE_LIMIT,
 };
 
@@ -167,16 +329,24 @@ enum MHI_PM_STATE {
 	MHI_PM_M3_ENTER = BIT(6),
 	MHI_PM_M3 = BIT(7),
 	MHI_PM_M3_EXIT = BIT(8),
-	MHI_PM_SYS_ERR_DETECT = BIT(9),
-	MHI_PM_SYS_ERR_PROCESS = BIT(10),
-	MHI_PM_SHUTDOWN_PROCESS = BIT(11),
-	MHI_PM_LD_ERR_FATAL_DETECT = BIT(12), /* Link not accessible */
-	MHI_PM_SSR_PENDING = BIT(13)
+	MHI_PM_FW_DL_ERR = BIT(9), /* Firmware download failure state */
+	MHI_PM_SYS_ERR_DETECT = BIT(10),
+	MHI_PM_SYS_ERR_PROCESS = BIT(11),
+	MHI_PM_SHUTDOWN_PROCESS = BIT(12),
+	MHI_PM_LD_ERR_FATAL_DETECT = BIT(13), /* Link not accessible */
+	MHI_PM_SSR_PENDING = BIT(14),
 };
 
 struct mhi_pm_transitions {
 	enum MHI_PM_STATE from_state;
 	u32 to_states;
+};
+
+enum MHI_XFER_TYPE {
+	MHI_XFER_BUFFER,
+	MHI_XFER_SKB,
+	MHI_XFER_SCATTERLIST,
+	MHI_XFER_IOMMU,
 };
 
 #define MHI_DB_ACCESS_VALID(pm_state) (pm_state & (MHI_PM_M0 | MHI_PM_M1))
@@ -185,17 +355,19 @@ struct mhi_pm_transitions {
 #define MHI_REG_ACCESS_VALID(pm_state) ((pm_state & (MHI_PM_POR | MHI_PM_M0 | \
 		MHI_PM_M1 | MHI_PM_M2 | MHI_PM_M3_ENTER | MHI_PM_M3_EXIT | \
 		MHI_PM_SYS_ERR_DETECT | MHI_PM_SYS_ERR_PROCESS | \
-		MHI_PM_SHUTDOWN_PROCESS)))
+		MHI_PM_SHUTDOWN_PROCESS | MHI_PM_FW_DL_ERR)))
 #define MHI_EVENT_ACCESS_INVALID(pm_state) (pm_state == MHI_PM_DISABLE || \
 					    pm_state >= MHI_PM_SYS_ERR_DETECT)
 struct __packed mhi_event_ctxt {
-	u32 mhi_intmodt;
-	u32 mhi_event_er_type;
-	u32 mhi_msi_vector;
-	u64 mhi_event_ring_base_addr;
-	u64 mhi_event_ring_len;
-	u64 mhi_event_read_ptr;
-	u64 mhi_event_write_ptr;
+	u32 reserved : 8;
+	u32 intmodc : 8;
+	u32 intmodt : 16;
+	u32 ertype;
+	u32 msivec;
+	u64 rbase;
+	u64 rlen;
+	u64 rp;
+	u64 wp;
 };
 
 struct __packed mhi_chan_ctxt {
@@ -204,22 +376,68 @@ struct __packed mhi_chan_ctxt {
 	u32 pollcfg : 6;
 	u32 reserved : 16;
 	u32 chtype;
-	u32 mhi_event_ring_index;
-	u64 mhi_trb_ring_base_addr;
-	u64 mhi_trb_ring_len;
-	u64 mhi_trb_read_ptr;
-	u64 mhi_trb_write_ptr;
+	u32 erindex;
+	u64 rbase;
+	u64 rlen;
+	u64 rp;
+	u64 wp;
 };
 
 struct __packed mhi_cmd_ctxt {
-	u32 mhi_cmd_ctxt_reserved1;
-	u32 mhi_cmd_ctxt_reserved2;
-	u32 mhi_cmd_ctxt_reserved3;
-	u64 mhi_cmd_ring_base_addr;
-	u64 mhi_cmd_ring_len;
-	u64 mhi_cmd_ring_read_ptr;
-	u64 mhi_cmd_ring_write_ptr;
+	u32 reserved0;
+	u32 reserved1;
+	u32 reserved2;
+	u64 rbase;
+	u64 rlen;
+	u64 rp;
+	u64 wp;
 };
+
+struct __packed mhi_tre {
+	u64 ptr;
+	u32 dword[2];
+};
+
+/* NO OP Command */
+#define MHI_TRE_CMD_NOOP_PTR (0)
+#define MHI_TRE_CMD_NOOP_DWORD0 (0)
+#define MHI_TRE_CMD_NOOP_DWORD1 (1 << 16)
+
+/* Channel Reset Command */
+#define MHI_TRE_CMD_RESET_PTR (0)
+#define MHI_TRE_CMD_RESET_DWORD0 (0)
+#define MHI_TRE_CMD_RESET_DWORD1(chid) ((chid << 24) | (16 << 16))
+
+/* Channel Reset Command */
+#define MHI_TRE_CMD_STOP_PTR (0)
+#define MHI_TRE_CMD_STOP_DWORD0 (0)
+#define MHI_TRE_CMD_STOP_DWORD1(chid) ((chid << 24) | (17 << 16))
+
+/* Start Channel Command */
+#define MHI_TRE_CMD_START_PTR (0)
+#define MHI_TRE_CMD_START_DWORD0 (0)
+#define MHI_TRE_CMD_START_DWORD1(chid) ((chid << 24) | (18 << 16))
+
+#define MHI_TRE_GET_CMD_CHID(tre) (((tre)->dword[1] >> 24) & 0xFF)
+
+/* Event Related macros */
+#define MHI_TRE_EV_PTR(ptr) (ptr)
+#define MHI_TRE_EV_DWORD0(code, len) ((code << 24) | len)
+#define MHI_TRE_EV_DWORD1(chid, type) ((chid << 24) | (type << 16))
+#define MHI_TRE_GET_EV_PTR(tre) ((tre)->ptr)
+#define MHI_TRE_GET_EV_CODE(tre) (((tre)->dword[0] >> 24) & 0xFF)
+#define MHI_TRE_GET_EV_LEN(tre) ((tre)->dword[0] & 0xFFFF)
+#define MHI_TRE_GET_EV_CHID(tre) (((tre)->dword[1] >> 24) & 0xFF)
+#define MHI_TRE_GET_EV_TYPE(tre) (((tre)->dword[1] >> 16) & 0xFF)
+#define MHI_TRE_GET_EV_STATE(tre) (((tre)->dword[0] >> 24) & 0xFF)
+#define MHI_TRE_GET_EV_EXECENV(tre) (((tre)->dword[0] >> 24) & 0xFF)
+
+
+/* TRE macros */
+#define MHI_TRE_DATA_PTR(ptr) (ptr)
+#define MHI_TRE_DATA_DWORD0(len) (len)
+#define MHI_TRE_DATA_DWORD1(bei, ieot, ieob, chain) ((2 << 16) | (bei << 10) \
+	| (ieot << 9) | (ieob << 8) | chain )
 
 enum MHI_COMMAND {
 	MHI_COMMAND_NOOP = 0x0,
@@ -245,74 +463,6 @@ enum MHI_PKT_TYPE {
 	MHI_PKT_TYPE_STALE_EVENT, /* Internal event */
 };
 
-struct __packed mhi_tx_pkt {
-	u64 buffer_ptr;
-	u32 buf_len;
-	u32 info;
-};
-
-struct __packed mhi_noop_tx_pkt {
-	u64 reserved1;
-	u32 reserved2;
-	u32 info;
-};
-
-struct __packed mhi_noop_cmd_pkt {
-	u64 reserved1;
-	u32 reserved2;
-	u32 info;
-};
-
-struct __packed mhi_reset_chan_cmd_pkt {
-	u32 reserved1;
-	u32 reserved2;
-	u32 reserved3;
-	u32 info;
-};
-
-struct __packed mhi_ee_state_change_event {
-	u64 reserved1;
-	u32 exec_env;
-	u32 info;
-};
-
-struct __packed mhi_xfer_event_pkt {
-	u64 xfer_ptr;
-	u32 xfer_details;
-	u32 info;
-};
-
-struct __packed mhi_cmd_complete_event_pkt {
-	u64 ptr;
-	u32 code;
-	u32 info;
-};
-
-struct __packed mhi_state_change_event_pkt {
-	u64 reserved1;
-	u32 state;
-	u32 info;
-};
-
-union __packed mhi_xfer_pkt {
-	struct mhi_tx_pkt data_tx_pkt;
-	struct mhi_noop_tx_pkt noop_tx_pkt;
-	struct mhi_tx_pkt type;
-};
-
-union __packed mhi_cmd_pkt {
-	struct mhi_reset_chan_cmd_pkt reset_cmd_pkt;
-	struct mhi_noop_cmd_pkt noop_cmd_pkt;
-	struct mhi_noop_cmd_pkt type;
-};
-
-union __packed mhi_event_pkt {
-	struct mhi_xfer_event_pkt xfer_event_pkt;
-	struct mhi_cmd_complete_event_pkt cmd_complete_event_pkt;
-	struct mhi_state_change_event_pkt state_change_event_pkt;
-	struct mhi_ee_state_change_event ee_event_pkt;
-	struct mhi_xfer_event_pkt type;
-};
 
 enum MHI_EVENT_CCS {
 	MHI_EVENT_CC_INVALID = 0x0,
@@ -330,31 +480,11 @@ struct db_mode {
 	/* if set do not reset DB_Mode during M0 resume */
 	u32 preserve_db_state : 1;
 	u32 db_mode : 1;
+	u32 pollcfg : 16;
 	enum MHI_BRSTMODE brstmode;
-	void (*process_db)(struct mhi_device_ctxt *mhi_dev_ctxt,
-			   void __iomem *io_addr, unsigned int chan,
-			   dma_addr_t val);
-};
-
-struct mhi_ring {
-	void *base;
-	void *wp;
-	void *rp;
-	void *ack_rp;
-	uintptr_t len;
-	uintptr_t el_size;
-	u32 overwrite_en;
-	enum MHI_CHAN_DIR dir;
-	enum MHI_CHAN_STATE ch_state;
-	struct db_mode db_mode;
-	u32 msi_disable_cntr;
-	u32 msi_enable_cntr;
-	spinlock_t ring_lock;
-	struct dma_pool *dma_pool;
-	struct tasklet_struct ev_task;
-	struct work_struct ev_worker;
-	struct mhi_device_ctxt *mhi_dev_ctxt;
-	int index;
+	dma_addr_t db;
+	void (*process_db)(struct mhi_device *, struct db_mode *,
+			   void __iomem *, dma_addr_t);
 };
 
 enum MHI_CMD_STATUS {
@@ -367,7 +497,6 @@ enum MHI_CMD_STATUS {
 enum MHI_EVENT_RING_TYPE {
 	MHI_EVENT_RING_TYPE_INVALID = 0x0,
 	MHI_EVENT_RING_TYPE_VALID = 0x1,
-	MHI_EVENT_RING_TYPE_reserved = 0x80000000
 };
 
 enum MHI_INIT_ERROR_STAGE {
@@ -406,7 +535,10 @@ enum MHI_EXEC_ENV {
 	MHI_EXEC_ENV_AMSS = 0x2,
 	MHI_EXEC_ENV_BHIE = 0x3,
 	MHI_EXEC_ENV_RDDM = 0x4,
+	MHI_EXEC_MAX_SUPPORTED = MHI_EXEC_ENV_RDDM,
 	MHI_EXEC_ENV_DISABLE_TRANSITION, /* local EE, not related to mhi spec */
+	MHI_EXEC_INVALID,
+	MHI_EXEC_LIMIT
 };
 
 struct mhi_chan_info {
@@ -416,200 +548,73 @@ struct mhi_chan_info {
 	u32 flags;
 };
 
-struct mhi_chan_cfg {
-	enum MHI_COMMAND current_cmd;
-	struct mutex chan_lock;
-	spinlock_t event_lock; /* completion event lock */
-	struct completion cmd_complete;
-	struct mhi_cmd_complete_event_pkt cmd_event_pkt;
-	union mhi_cmd_pkt cmd_pkt;
-};
-
-struct mhi_client_config {
-	struct mhi_chan_info chan_info;
-	struct mhi_device_ctxt *mhi_dev_ctxt;
-	struct mhi_client_info_t client_info;
+//Also put struct mhi_chan into it
+struct mhi_client_data {
+	int chan;
+	struct mhi_device *mhi_dev;
+	void (*mhi_client_cb)(struct mhi_cb_info *);
+	void (*mhi_xfer_cb)(struct mhi_cb_info *);
 	void *user_data;
-	struct mhi_result result;
-	u32 device_index;
-	u32 msi_vec;
-	u32 intmod_t;
-	u32 pkt_count;
-	int magic;
-	int chan_status;
-	int event_ring_index;
-};
-
-enum MHI_TYPE_EVENT_RING {
-	MHI_ER_DATA_TYPE = 0x1,
-	MHI_ER_CTRL_TYPE = 0x2,
-	MHI_ER_TYPE_RESERVED = 0x80000000
-};
-
-struct mhi_state_work_queue {
-	spinlock_t *q_lock;
-	struct mhi_ring q_info;
-	u32 queue_full_cntr;
-	enum STATE_TRANSITION buf[MHI_WORK_Q_MAX_SIZE];
+	struct mhi_client_handle client_handle;
 };
 
 struct mhi_buf_info {
-	dma_addr_t bb_p_addr;
-	dma_addr_t pre_alloc_p_addr;
-	void *bb_v_addr;
-	void *pre_alloc_v_addr;
-	void *client_buf;
-	size_t buf_len;
-	size_t pre_alloc_len;
-	size_t filled_size;
+	dma_addr_t p_addr;
+	void *v_addr;
+	void *wp;
+	size_t len;
+	void *cb_buf;
 	enum dma_data_direction dir;
-	int bb_active;
 };
 
-struct mhi_counters {
-	u32 m0_m1;
-	u32 m1_m2;
-	u32 m2_m0;
-	u32 m0_m3;
-	u32 m1_m3;
-	u32 m3_m0;
-	u32 chan_pkts_xferd[MHI_MAX_CHANNELS];
-	u32 bb_used[MHI_MAX_CHANNELS];
-	atomic_t device_wake;
-	atomic_t outbound_acks;
-	u32 *msi_counter;
-	u32 mhi_reset_cntr;
-	u32 link_down_cntr;
-	u32 link_up_cntr;
+
+#define MHI_MAX_CHANNELS (103)
+#define MHI_SMMU_ATTACH BIT(0)
+#define MHI_SMMU_S1_BYPASS BIT(1)
+#define MHI_SMMU_FAST BIT(2)
+#define MHI_SMMU_ATOMIC BIT(3)
+#define MHI_SMMU_GEOMETRY BIT(4)
+#define MHI_SMMU_FORCE_COHERENT BIT(5)
+
+/* things copied from mhi_macros.h */
+#define NR_OF_CMD_RINGS 1
+#define PRIMARY_CMD_RING 0
+#define MHI_EPID 4 //Move to rmnet
+#define MHI_RPM_AUTOSUSPEND_TMR_VAL_MS 1000
+#define CMD_EL_PER_RING 128
+#define MHI_M2_DEBOUNCE_TMR_US 10000
+#define MHI_THREAD_SLEEP_TIMEOUT_MS 100
+#define MHI_MAX_STATE_TRANSITION_TIMEOUT 5000
+
+#define PCI_INVALID_READ(val) (val == U32_MAX)
+
+struct mhi_ring {
+	dma_addr_t dma_handle;
+	dma_addr_t phys_base;
+	dma_addr_t *ctxt_wp; /* point to ctxt wp */
+	void *pre_aligned;
+	void *base;
+	void *rp;
+	void *wp;
+	void *ack_rp; //FIXME: temporary.
+	size_t el_size;
+	size_t len;
+	size_t elements;
+	size_t alloc_size;
+	void __iomem *db_addr;
 };
 
-struct mhi_flags {
-	bool mhi_initialized;
-	u32 link_up;
-	bool bb_required;
-};
-
-struct mhi_wait_queues {
-	wait_queue_head_t *m0_event;
-	wait_queue_head_t *m3_event;
-	wait_queue_head_t *bhi_event;
-};
-
-struct dev_mmio_info {
-	void __iomem *mmio_addr;
-	void __iomem *chan_db_addr;
-	void __iomem *event_db_addr;
-	void __iomem *cmd_db_addr;
-	u64 mmio_len;
-	u32 nr_event_rings;
-	u32 nr_hw_event_rings;
-	u32 nr_sw_event_rings;
-	u32 nr_sw_xfer_rings;
-	u32 nr_hw_xfer_rings;
-	dma_addr_t dma_ev_ctxt; /* Bus address of ECABAP*/
-};
-
-struct mhi_ring_ctxt {
-	struct mhi_event_ctxt *ec_list;
-	struct mhi_chan_ctxt *cc_list;
-	struct mhi_cmd_ctxt *cmd_ctxt;
-	dma_addr_t dma_ec_list;
-	dma_addr_t dma_cc_list;
-	dma_addr_t dma_cmd_ctxt;
-};
-
-struct mhi_dev_space {
-	void *dev_mem_start;
-	dma_addr_t dma_dev_mem_start;
-	size_t dev_mem_len;
-	struct mhi_ring_ctxt ring_ctxt;
-	u64 start_win_addr;
-	u64 end_win_addr;
-};
-
-struct mhi_device_ctxt {
-	struct list_head node;
-	struct pcie_core_info core;
-	struct msm_pcie_register_event mhi_pci_link_event;
-	struct pci_dev *pcie_device;
-	struct bhi_ctxt_t bhi_ctxt;
-	struct platform_device *plat_dev;
-	enum MHI_PM_STATE mhi_pm_state; /* Host driver state */
-	enum MHI_STATE mhi_state; /* protocol state */
-	enum MHI_EXEC_ENV dev_exec_env;
-
-	struct mhi_dev_space dev_space;
-	struct mhi_ring chan_bb_list[MHI_MAX_CHANNELS];
-	struct mhi_ring mhi_local_chan_ctxt[MHI_MAX_CHANNELS];
-
-	struct mhi_ring *mhi_local_event_ctxt;
-	struct mhi_ring mhi_local_cmd_ctxt[NR_OF_CMD_RINGS];
-	struct mhi_chan_cfg mhi_chan_cfg[MHI_MAX_CHANNELS];
-
-	struct mhi_client_handle *client_handle_list[MHI_MAX_CHANNELS];
-	struct mhi_event_ring_cfg *ev_ring_props;
-	struct work_struct st_thread_worker;
-	struct work_struct process_m1_worker;
-	struct work_struct process_sys_err_worker;
-	struct mhi_wait_queues mhi_ev_wq;
-	struct dev_mmio_info mmio_info;
-
-	struct mhi_state_work_queue state_change_work_item_list;
-
-	struct mhi_counters counters;
-	struct mhi_flags flags;
-
-	struct hrtimer m1_timer;
-	ktime_t m1_timeout;
-	u32 poll_reset_timeout_ms;
-
-	struct notifier_block mhi_ssr_nb;
-	struct esoc_desc *esoc_handle;
-	void *esoc_ssr_handle;
-
-	u32 bus_client;
-	struct msm_bus_scale_pdata *bus_scale_table;
-	struct notifier_block mhi_cpu_notifier;
-
-	unsigned long esoc_notif;
-	enum STATE_TRANSITION base_state;
-
-	rwlock_t pm_xfer_lock; /* lock to control PM State */
-	spinlock_t dev_wake_lock; /* lock to set wake bit */
-	struct mutex pm_lock;
-	struct wakeup_source w_lock;
-
-	char *chan_info;
-	struct dentry *child;
-	struct dentry *parent;
-	void *mhi_ipc_log;
-
-	/* Shadow functions since not all device supports runtime pm */
-	int (*bus_master_rt_get)(struct pci_dev *pci_dev);
-	void (*bus_master_rt_put)(struct pci_dev *pci_dev);
-	void (*runtime_get)(struct mhi_device_ctxt *mhi_dev_ctxt);
-	void (*runtime_put)(struct mhi_device_ctxt *mhi_dev_ctxt);
-	void (*assert_wake)(struct mhi_device_ctxt *mhi_dev_ctxt,
-			    bool force_set);
-	void (*deassert_wake)(struct mhi_device_ctxt *mhi_dev_ctxt);
-	void (*status_cb)(enum MHI_CB_REASON, void *priv);
-	void *priv_data; /* private data for bus master */
-	struct completion cmd_complete;
-};
-
-struct mhi_device_driver {
-	struct mutex lock;
-	struct list_head head;
-	struct class *mhi_bhi_class;
-	struct dentry *parent;
-};
-
-struct mhi_event_ring_cfg {
-	u32 nr_desc;
-	u32 msi_vec;
+struct mhi_event {
+	struct mhi_ring ring;
+	struct db_mode db_mode;
+	spinlock_t lock;
+	struct mutex mutex;
+	struct tasklet_struct task;
+	struct work_struct worker;
+	struct mhi_device *mhi_dev;
+	u32 index;
+	u32 msi;
 	u32 intmod;
-	enum MHI_CLIENT_CHANNEL chan;
-	u32 flags;
 	/*
 	 * Priority of event handling:
 	 * 0 = highest, handle events in isr (reserved for future)
@@ -618,154 +623,303 @@ struct mhi_event_ring_cfg {
 	 */
 	u32 priority;
 	enum MHI_RING_CLASS class;
-	irqreturn_t (*mhi_handler_ptr)(int , void *);
+	bool client_manage;
+	struct mhi_chan *chan; /* dedicated ev ring to this channel */
 };
 #define MHI_EV_PRIORITY_TASKLET (1)
+#define MHI_CTRL_ER_INDEX (0) /* ctrl event ring */
+#define MHI_EV_CFG_HW_EV BIT(0)
+#define MHI_EV_CFG_CL_MANAGE BIT(1)
 
-struct mhi_data_buf {
-	dma_addr_t bounce_buffer;
-	dma_addr_t client_buffer;
-	u32 bounce_flag;
+struct mhi_chan {
+	/*
+	 * important, when consuming update tre_ring first, when freeing update
+	 * buf_ring first. If tre_ring has space, buf_ring
+	 * guranteed to have space so we do not need to check both rings.
+	 */
+	struct mhi_ring buf_ring;
+	struct mhi_ring tre_ring;
+	u32 er_index;
+	int chan;
+	const char *name;
+	enum dma_data_direction dir;
+	enum MHI_CHAN_STATE ch_state;
+	enum MHI_EXEC_ENV exec_env;
+	struct db_mode db_mode;
+	struct mutex mutex;
+	rwlock_t lock;
+	struct completion completion;
+	struct __packed mhi_tre ev_tre;
+	struct __packed mhi_tre cmd_tre;
+	struct mhi_client_data *cldata;
+	/* functions that generate the tre */
+	int (*gen_tre)(struct mhi_device *, struct mhi_chan *, void *, void *,
+		       size_t, enum MHI_FLAGS);
+	int (*queue_xfer)(struct mhi_client_handle *, void *, size_t,
+			  enum MHI_FLAGS);
+	u32 tiocm;
+	bool supported;
+	size_t pkts;
+	size_t bytes;
 };
 
-extern struct mhi_device_driver *mhi_device_drv;
+struct mhi_ctxt {
+	struct mhi_event_ctxt *er_ctxt;
+	struct mhi_chan_ctxt *chan_ctxt;
+	struct mhi_cmd_ctxt *cmd_ctxt;
+	dma_addr_t er_addr;
+	dma_addr_t chan_addr;
+	dma_addr_t cmd_addr;
+};
 
-irqreturn_t mhi_msi_ipa_handlr(int irq_number, void *dev_id);
-int mhi_reset_all_thread_queues(
-					struct mhi_device_ctxt *mhi_dev_ctxt);
-int mhi_add_elements_to_event_rings(
-				struct mhi_device_ctxt *mhi_dev_ctxt,
-					enum STATE_TRANSITION new_state);
-int get_nr_avail_ring_elements(struct mhi_device_ctxt *mhi_dev_ctxt,
-			       struct mhi_ring *ring);
-int get_nr_enclosed_el(struct mhi_ring *ring, void *loc_1,
-					void *loc_2, u32 *nr_el);
-int mhi_init_mmio(struct mhi_device_ctxt *mhi_dev_ctxt);
-int mhi_init_device_ctxt(struct mhi_device_ctxt *mhi_dev_ctxt);
-int mhi_init_local_event_ring(struct mhi_device_ctxt *mhi_dev_ctxt,
-		u32 nr_ev_el, u32 event_ring_index);
-int mhi_send_cmd(struct mhi_device_ctxt *dest_device,
-			enum MHI_COMMAND which_cmd, u32 chan);
-int mhi_queue_tx_pkt(struct mhi_device_ctxt *mhi_dev_ctxt,
-				enum MHI_CLIENT_CHANNEL chan,
-				void *payload,
-				size_t payload_size);
-int mhi_init_chan_ctxt(struct mhi_chan_ctxt *cc_list,
-				   uintptr_t trb_list_phy,
-				   uintptr_t trb_list_virt,
-				   u64 el_per_ring,
-				   enum MHI_CHAN_DIR chan_type,
-				   u32 event_ring,
-				   struct mhi_ring *ring,
-				   enum MHI_CHAN_STATE chan_state,
-				   bool preserve_db_state,
-				   enum MHI_BRSTMODE brstmode);
-int mhi_populate_event_cfg(struct mhi_device_ctxt *mhi_dev_ctxt);
-int mhi_get_event_ring_for_channel(struct mhi_device_ctxt *mhi_dev_ctxt,
-					      u32 chan);
-int delete_element(struct mhi_ring *ring, void **rp,
-			 void **wp, void **assigned_addr);
-int ctxt_add_element(struct mhi_ring *ring, void **assigned_addr);
-int ctxt_del_element(struct mhi_ring *ring, void **assigned_addr);
-int get_element_index(struct mhi_ring *ring, void *address,
-							uintptr_t *index);
-int recycle_trb_and_ring(struct mhi_device_ctxt *mhi_dev_ctxt,
-	struct mhi_ring *ring, enum MHI_RING_TYPE ring_type, u32 ring_index);
-int parse_xfer_event(struct mhi_device_ctxt *ctxt,
-				union mhi_event_pkt *event, u32 event_id);
-enum MHI_EVENT_CCS get_cmd_pkt(struct mhi_device_ctxt *mhi_dev_ctxt,
-				union mhi_event_pkt *ev_pkt,
-				union mhi_cmd_pkt **cmd_pkt, u32 event_index);
-int parse_cmd_event(struct mhi_device_ctxt *ctxt,
-				union mhi_event_pkt *event, u32 event_index);
-int mhi_test_for_device_ready(struct mhi_device_ctxt *mhi_dev_ctxt);
-int mhi_test_for_device_reset(struct mhi_device_ctxt *mhi_dev_ctxt);
-int validate_ring_el_addr(struct mhi_ring *ring, uintptr_t addr);
-int validate_ev_el_addr(struct mhi_ring *ring, uintptr_t addr);
-void mhi_state_change_worker(struct work_struct *work);
-void mhi_sys_err_worker(struct work_struct *work);
-int mhi_init_state_transition(struct mhi_device_ctxt *mhi_dev_ctxt,
-					enum STATE_TRANSITION new_state);
-int mhi_wait_for_mdm(struct mhi_device_ctxt *mhi_dev_ctxt);
-enum hrtimer_restart mhi_initiate_m1(struct hrtimer *timer);
-int mhi_pci_suspend(struct device *dev);
-int mhi_pci_resume(struct device *dev);
-int mhi_init_pcie_device(struct mhi_device_ctxt *mhi_dev_ctxt);
-int mhi_init_pm_sysfs(struct device *dev);
-void mhi_rem_pm_sysfs(struct device *dev);
-void mhi_pci_remove(struct pci_dev *mhi_device);
-int mhi_ctxt_init(struct mhi_device_ctxt *mhi_dev_ctxt);
-int mhi_get_chan_max_buffers(u32 chan);
-int mhi_esoc_register(struct mhi_device_ctxt *mhi_dev_ctxt);
-void mhi_link_state_cb(struct msm_pcie_notify *notify);
-void mhi_notify_clients(struct mhi_device_ctxt *mhi_dev_ctxt,
-						enum MHI_CB_REASON reason);
-void mhi_notify_client(struct mhi_client_handle *client_handle,
-		       enum MHI_CB_REASON reason);
-void mhi_master_mode_runtime_get(struct mhi_device_ctxt *mhi_dev_ctxt);
-void mhi_master_mode_runtime_put(struct mhi_device_ctxt *mhi_dev_ctxt);
-void mhi_slave_mode_runtime_get(struct mhi_device_ctxt *mhi_dev_ctxt);
-void mhi_slave_mode_runtime_put(struct mhi_device_ctxt *mhi_dev_ctxt);
-void mhi_deassert_device_wake(struct mhi_device_ctxt *mhi_dev_ctxt);
-void mhi_assert_device_wake(struct mhi_device_ctxt *mhi_dev_ctxt,
-			    bool force_set);
-int mhi_reg_notifiers(struct mhi_device_ctxt *mhi_dev_ctxt);
-int mhi_cpu_notifier_cb(struct notifier_block *nfb, unsigned long action,
-			void *hcpu);
-int init_mhi_base_state(struct mhi_device_ctxt *mhi_dev_ctxt);
-int mhi_turn_off_pcie_link(struct mhi_device_ctxt *mhi_dev_ctxt, bool graceful);
-int mhi_turn_on_pcie_link(struct mhi_device_ctxt *mhi_dev_ctxt);
-int mhi_initiate_m0(struct mhi_device_ctxt *mhi_dev_ctxt);
-int mhi_initiate_m3(struct mhi_device_ctxt *mhi_dev_ctxt);
-int mhi_set_bus_request(struct mhi_device_ctxt *mhi_dev_ctxt,
-					int index);
-int start_chan_sync(struct mhi_client_handle *client_handle);
-void mhi_process_db_brstmode(struct mhi_device_ctxt *mhi_dev_ctxt,
-			     void __iomem *io_addr, unsigned int chan,
-			     dma_addr_t val);
-void mhi_process_db_brstmode_disable(struct mhi_device_ctxt *mhi_dev_ctxt,
-				     void __iomem *io_addr, unsigned int chan,
-				     dma_addr_t val);
-void mhi_process_db(struct mhi_device_ctxt *mhi_dev_ctxt, void __iomem *io_addr,
-		    unsigned int chan, dma_addr_t val);
-void mhi_reg_write_field(struct mhi_device_ctxt *mhi_dev_ctxt,
-			 void __iomem *io_addr,
-			 uintptr_t io_offset,
-			 u32 mask, u32 shift, u32 val);
-void mhi_reg_write(struct mhi_device_ctxt *mhi_dev_ctxt,
-		   void __iomem *io_addr, uintptr_t io_offset, u32 val);
-u32 mhi_reg_read(void __iomem *io_addr, uintptr_t io_offset);
-u32 mhi_reg_read_field(void __iomem *io_addr, uintptr_t io_offset,
-			 u32 mask, u32 shift);
-void mhi_exit_m2(struct mhi_device_ctxt *mhi_dev_ctxt);
-int mhi_runtime_suspend(struct device *dev);
-int get_chan_props(struct mhi_device_ctxt *mhi_dev_ctxt, int chan,
-		   struct mhi_chan_info *chan_info);
-int mhi_runtime_resume(struct device *dev);
+struct arch_info;
+
+struct mhi_device {
+	struct list_head node;
+	struct device *dev; /* dev used for all memory operations */
+	struct platform_device *pdev;
+	struct pci_dev *pci_dev;
+	void __iomem *regs;
+	void __iomem *bhi;
+	void __iomem *wake_db;
+	u32 dev_id;
+	u32 domain;
+	u32 bus;
+	u32 slot;
+	bool pci_master;
+	u32 irq;
+
+	/* firmware and rddm related info */
+	bool dl_fw;
+	const char *fw_image;
+	size_t sbl_len;
+	size_t seg_len;
+	bool support_rddm;
+	size_t rddm_len;
+	struct bhie_vec_table fw_table;
+	struct bhie_vec_table rddm_table;
+
+	/* MHI Software and Hardware States */
+	enum MHI_PM_STATE pm_state;
+	enum MHI_STATE dev_state;
+	enum MHI_EXEC_ENV dev_exec_env;
+	bool wake;
+	wait_queue_head_t state_event;
+	struct completion completion;
+
+	/* MHI Context */
+	struct mhi_ctxt mhi_ctxt;
+	dma_addr_t iova_start;
+	dma_addr_t iova_end;
+	struct mhi_chan mhi_chan[MHI_MAX_CHANNELS];
+	struct mhi_ring mhi_cmd[NR_OF_CMD_RINGS];
+	struct mhi_event *mhi_event;
+	spinlock_t cmd_lock;
+	u32 ev_rings;
+	u32 hw_ev_rings;
+	u32 sw_ev_rings;
+	u32 hw_xfer_rings;
+	u32 sw_xfer_rings;
+
+	/* workers for state transitions */
+	struct work_struct st_worker;
+	struct work_struct m1_worker;
+	struct work_struct sys_err_worker;
+	struct work_struct fw_load_worker;
+	struct mhi_ring work_ring;
+	spinlock_t work_lock;
+
+	bool configured;
+	u32 smmu_cfg;
+	u32 poll_timeout;
+	u32 fw_timeout;
+
+	/* architecture specific data structures */
+	struct arch_info *arch_info;
+
+	rwlock_t pm_lock;
+	spinlock_t wake_lock;
+	struct mutex mutex;
+
+	atomic_t dev_wake;
+	bool wake_set;
+	atomic_t pending_acks;
+	atomic_t alloc_size;
+
+	/* Shadow functions pts since they may */
+	int (*bus_master_rt_get)(struct pci_dev *);
+	void (*bus_master_rt_put)(struct pci_dev *);
+	void (*runtime_get)(struct mhi_device *);
+	void (*runtime_put)(struct mhi_device *);
+	void (*assert_wake)(struct mhi_device *, bool);
+	void (*deassert_wake)(struct mhi_device *, bool);
+	void (*status_cb)(enum MHI_CB_REASON, void *);
+	long (*tiocmset)(struct mhi_device *, int, u32);
+	void *priv_data; /* private data for bus master */
+
+
+	struct dentry *dentry;
+	void *log; /* arch specific logging */
+};
+
+struct mhi_device_driver {
+	struct list_head head;
+	struct mutex lock;
+	struct dentry *dentry;
+};
+
+extern struct mhi_device_driver mhi_device_drv;
+
+#ifndef CONFIG_ARCH_QCOM
+static inline int mhi_arch_platform_init(struct mhi_device *mhi_dev) {
+	return 0;
+};
+static inline int mhi_arch_pcie_init(struct mhi_device *mhi_dev) {
+	return 0;
+};
+static inline int mhi_arch_post_init(struct mhi_device *mhi_dev) {
+	return 0;
+};
+static inline int mhi_arch_link_off(struct mhi_device *mhi_dev, bool graceful) {
+	return 0;
+};
+static inline int mhi_arch_link_on(struct mhi_device *mhi_dev) {
+	return 0;
+};
+
+#define MHI_IOMMU_INIT(mhi_dev) mhi_default_iommu_init(mhi_dev)
+
+#define mhi_log(mhi_dev, _msg_lvl, _msg, ...) do {	\
+		if ((_msg_lvl) >= mhi_msg_lvl) \
+			pr_alert("[%s] [0x%04x]" _msg, __func__, \
+				 mhi_dev->dev_id, ##__VA_ARGS__); \
+} while (0)
+
+#else
+
+#include <linux/ipc_logging.h>
+extern enum MHI_DEBUG_LEVEL mhi_qcom_log_lvl;
+#define mhi_log(mhi_dev, _msg_lvl, _msg, ...) do {	\
+		if ((_msg_lvl) >= mhi_msg_lvl) \
+			pr_alert("[%s] " _msg, __func__, ##__VA_ARGS__);\
+		if (mhi_dev->log && \
+		    ((_msg_lvl) >= mhi_qcom_log_lvl)) \
+			ipc_log_string(mhi_dev->log,		      \
+                              "[%s] " _msg, __func__, ##__VA_ARGS__); \
+} while (0)
+
+int mhi_arch_platform_init(struct mhi_device *);
+int mhi_arch_pcie_init(struct mhi_device *);
+int mhi_arch_post_init(struct mhi_device *);
+int mhi_arch_link_off(struct mhi_device *, bool);
+int mhi_arch_link_on(struct mhi_device *);
+int mhi_arch_qcom_init_smmu(struct mhi_device *);
+
+#define MHI_IOMMU_INIT(mhi_dev) mhi_arch_qcom_init_smmu(mhi_dev)
+
+#endif
+
+
+
+////////////////////////////////////////////////////
+int mhi_dma_mask(struct mhi_device *mhi_dev);
+void *mhi_alloc_coherent(struct mhi_device *, size_t, dma_addr_t *, gfp_t);
+void mhi_free_coherent(struct mhi_device *, size_t, void *, dma_addr_t);
+int mhi_init_chan_ctxt(struct mhi_device *, struct mhi_chan *);
+
+
+void *mhi_to_virtual(struct mhi_ring *, dma_addr_t);
+
+void mhi_ring_chan_db(struct mhi_device *, struct mhi_chan *);
+enum MHI_EXEC_ENV mhi_get_exec_env(struct mhi_device *);
+void mhi_queue_state_transition(struct mhi_device *, enum STATE_TRANSITION);
+int mhi_runtime_suspend(struct device *);
+int mhi_runtime_resume(struct device *);
 int mhi_runtime_idle(struct device *dev);
-int init_ev_rings(struct mhi_device_ctxt *mhi_dev_ctxt,
-		  enum MHI_TYPE_EVENT_RING type);
-void mhi_reset_ev_ctxt(struct mhi_device_ctxt *mhi_dev_ctxt,
-				int index);
-void init_event_ctxt_array(struct mhi_device_ctxt *mhi_dev_ctxt);
-int create_local_ev_ctxt(struct mhi_device_ctxt *mhi_dev_ctxt);
-enum MHI_STATE mhi_get_m_state(struct mhi_device_ctxt *mhi_dev_ctxt);
+int parse_xfer_event(struct mhi_device *, struct __packed mhi_tre *, struct mhi_chan *);
+const char *state_transition_str(enum STATE_TRANSITION);
+//FIXME: rename to system suspend/resume
+int mhi_system_suspend(struct device *dev);
+int mhi_system_resume(struct device *dev);
+enum MHI_STATE mhi_get_m_state(struct mhi_device *);
+enum MHI_PM_STATE __must_check mhi_tryset_pm_state(struct mhi_device*, enum MHI_PM_STATE);
+void mhi_del_ring_element(struct mhi_device *, struct mhi_ring *);
+int get_nr_avail_ring_elements(struct mhi_device *, struct mhi_ring *);
+void mhi_add_ring_element(struct mhi_device *, struct mhi_ring *);
+void mhi_ring_er_db(struct mhi_event *);
+bool mhi_in_sys_err(struct mhi_device *);
+void mhi_ev_task(unsigned long);
+void process_event_ring(struct work_struct *);
+void mhi_write_reg(struct mhi_device *, void __iomem *, u32, u32);
+u32  __must_check mhi_read_reg(struct mhi_device *, void __iomem *, u32);
+u32 __must_check mhi_read_reg_field(struct mhi_device *, void __iomem *, u32, u32, u32);
+void mhi_write_reg_field(struct mhi_device *, void __iomem *,u32, u32, u32,
+			 u32);
+void mhi_ring_cmd_db(struct mhi_device *);
+int mhi_test_for_device_reset(struct mhi_device *, bool);
+int mhi_test_for_device_ready(struct mhi_device *);
+int mhi_init_mmio(struct mhi_device *);
+void mhi_notify_client(struct mhi_device *, struct mhi_chan *,
+		       enum MHI_CB_REASON);
+void mhi_set_m_state(struct mhi_device *, enum MHI_STATE);
+void mhi_process_db_brstmode(struct mhi_device *, struct db_mode *,
+		void __iomem *, dma_addr_t);
+void mhi_process_db_brstmode_disable(struct mhi_device *, struct db_mode *,
+		void __iomem *, dma_addr_t);
+void mhi_assert_device_wake(struct mhi_device *, bool);
+void mhi_deassert_device_wake(struct mhi_device *, bool);
+void mhi_slave_mode_runtime_get(struct mhi_device *);
+void mhi_slave_mode_runtime_put(struct mhi_device *);
+void mhi_master_mode_runtime_put(struct mhi_device *);
+void mhi_master_mode_runtime_get(struct mhi_device *);
+void bhi_load_worker(struct work_struct *);
+int process_reset_transition(struct mhi_device *mhi_dev);
+int mhi_queue_buffer(struct mhi_client_handle *,  void *, size_t,
+		     enum MHI_FLAGS);
+int mhi_queue_buf_tre(struct mhi_device *, struct mhi_chan *, void *, void *,
+		      size_t, enum MHI_FLAGS);
+int mhi_queue_skb(struct mhi_client_handle *, void *, size_t, enum MHI_FLAGS);
+int mhi_queue_scatterlist(struct mhi_client_handle *, void *,size_t,
+			  enum MHI_FLAGS);
+
+extern const char * const mhi_exec_env_str[MHI_EXEC_LIMIT];
+#define TO_MHI_EXEC_STR(exec) (((exec) >= MHI_EXEC_INVALID) ? \
+				 "INVALID_EXEC" : mhi_exec_env_str[exec])
+
+int mhi_debugfs_mhi_states_show(struct seq_file *, void *);
+int mhi_debugfs_mhi_event_show(struct seq_file *, void *);
+int mhi_debugfs_mhi_chan_show(struct seq_file *, void *);
+
+//FIXME: temp copy to fix compile errors
+ int mhi_send_cmd(struct mhi_device *mhi_dev,
+			enum MHI_COMMAND cmd,
+		  u32 chan);
+
+void mhi_reset_chan(struct mhi_device *, struct mhi_chan *);
+int mhi_init_pm_sysfs(struct device *);
 void process_m1_transition(struct work_struct *work);
-int set_mhi_base_state(struct mhi_device_ctxt *mhi_dev_ctxt);
-void mhi_set_m_state(struct mhi_device_ctxt *mhi_dev_ctxt,
-		     enum MHI_STATE new_state);
-const char *state_transition_str(enum STATE_TRANSITION state);
-void mhi_ev_task(unsigned long data);
-void process_event_ring(struct work_struct *work);
-int process_m0_transition(struct mhi_device_ctxt *mhi_dev_ctxt);
-int process_m3_transition(struct mhi_device_ctxt *mhi_dev_ctxt);
-enum MHI_PM_STATE __must_check mhi_tryset_pm_state(struct mhi_device_ctxt *,
-						   enum MHI_PM_STATE);
-void mhi_reset_chan(struct mhi_device_ctxt *mhi_dev_ctxt, int chan);
-void free_tre_ring(struct mhi_device_ctxt *mhi_dev_ctxt, int chan);
+void mhi_state_change_worker(struct work_struct *);
+void mhi_sys_err_worker(struct work_struct *);
+irqreturn_t mhi_msi_handlr(int irq_number, void *dev_id);
+void mhi_init_debugfs(struct mhi_device *);
+void mhi_deinit_chan_ctxt(struct mhi_device *, struct mhi_chan *);
+void mhi_de_init_chan_ctxt(struct mhi_device *, int);
+void mhi_assert_device_wake(struct mhi_device *mhi_dev, bool force_set);
+int process_m0_transition(struct mhi_device *);
+int process_m3_transition(struct mhi_device *);
+
+#define MSI_TO_IRQ(_MHI_DEV, _MSI_NR) \
+	((_MHI_DEV)->irq + (_MSI_NR))
+
+
+extern enum MHI_DEBUG_LEVEL mhi_msg_lvl;
+
+extern const char * const mhi_states_str[MHI_STATE_LIMIT];
+#define TO_MHI_STATE_STR(state) (((state) >= MHI_STATE_LIMIT) ? \
+				 "INVALID_STATE" : mhi_states_str[state])
+
 void process_disable_transition(enum MHI_PM_STATE transition_state,
-				struct mhi_device_ctxt *mhi_dev_ctxt);
-bool mhi_in_sys_err(struct mhi_device_ctxt *mhi_dev_ctxt);
-void bhi_exit(struct mhi_device_ctxt *mhi_dev_ctxt);
+				struct mhi_device *mhi_dev);
+
 
 #endif

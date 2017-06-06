@@ -107,7 +107,7 @@ Main node properties:
   Definition: Determine whether MHI host manages firmware download to device.
 
 - qcom,mhi-fw-image
-  Usage: required if MHI host managing firmware download process
+  Usage: optional
   Value type: string
   Definition: firmware image name
 
@@ -121,12 +121,18 @@ Main node properties:
   Value type: <u32>
   Definition: Segment size in bytes for each segment in bytes.
 
-- qcom,mhi-bb-required
+- qcom,smmu-cfg-mask
   Usage: optional
-  Value type: bool
-  Definition: Determine whether MHI device require bounce buffer
-	during active transfer.  If true, during channel open host
-	will pre-allocate transfer buffers.
+  Value type: <u32>
+  Definition: Determine whether MHI device driver requires to configure
+	SMMU that sits behind PCIe root complex.
+	Bit mask:
+	BIT(0) : Attach address mapping to endpoint device
+	BIT(1) : Set attribute S1_BYPASS
+	BIT(2) : Set attribute FAST
+	BIT(3) : Set attribute ATOMIC
+	BIT(4) : Set attribute GEOMETRY
+	BIT(5) : Set attribute PAGE_TABLE_FORCE_COHERENT
 
 ========
 Example:
@@ -149,4 +155,5 @@ mhi: qcom,mhi {
 	mhi-event-rings = <1>;
 	mhi-chan-cfg-102 = <0x66 0x80 0x5 0x62>;
 	mhi-event-cfg-0 = <0x80 0x0 0x0 0x0 0 1 0x11>;
+	qcom,smmu-cfg = <0x1d>
 };

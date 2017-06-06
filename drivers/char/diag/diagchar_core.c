@@ -3625,7 +3625,7 @@ static int diag_mhi_probe(struct platform_device *pdev)
 {
 	int ret;
 
-	if (!mhi_is_device_ready(&pdev->dev, "qcom,mhi"))
+	if (!mhi_is_device_ready(pdev->dev.of_node, "qcom,mhi"))
 		return -EPROBE_DEFER;
 	driver->pdev = pdev;
 	ret = diag_remote_init();
