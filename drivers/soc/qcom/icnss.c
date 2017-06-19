@@ -191,8 +191,8 @@ enum icnss_driver_state {
 	ICNSS_FW_TEST_MODE,
 	ICNSS_PM_SUSPEND,
 	ICNSS_PM_SUSPEND_NOIRQ,
-	ICNSS_SSR_ENABLED,
-	ICNSS_PDR_ENABLED,
+	ICNSS_SSR_REGISTERED,
+	ICNSS_PDR_REGISTERED,
 	ICNSS_PD_RESTART,
 	ICNSS_MSA0_ASSIGNED,
 	ICNSS_WLFW_EXISTS,
@@ -365,6 +365,8 @@ static struct icnss_priv {
 	struct icnss_wlan_mac_addr wlan_mac_addr;
 	bool bypass_s1_smmu;
 } *penv;
+
+static enum cnss_cc_src cnss_cc_source = CNSS_SOURCE_CORE;
 
 #ifdef CONFIG_ICNSS_DEBUG
 static void icnss_ignore_qmi_timeout(bool ignore)
@@ -938,6 +940,18 @@ static int icnss_hw_power_off(struct icnss_priv *priv)
 
 	return ret;
 }
+
+void cnss_set_cc_source(enum cnss_cc_src cc_source)
+{
+	cnss_cc_source = cc_source;
+}
+EXPORT_SYMBOL(cnss_set_cc_source);
+
+enum cnss_cc_src cnss_get_cc_source(void)
+{
+	return cnss_cc_source;
+}
+EXPORT_SYMBOL(cnss_get_cc_source);
 
 int icnss_power_on(struct device *dev)
 {
@@ -2347,7 +2361,7 @@ static int icnss_modem_notifier_nb(struct notifier_block *nb,
 	if (code != SUBSYS_BEFORE_SHUTDOWN)
 		return NOTIFY_OK;
 
-	if (test_bit(ICNSS_PDR_ENABLED, &priv->state))
+	if (test_bit(ICNSS_PDR_REGISTERED, &priv->state))
 		return NOTIFY_OK;
 
 	icnss_pr_info("Modem went down, state: 0x%lx, crashed: %d\n",
@@ -2388,14 +2402,14 @@ static int icnss_modem_ssr_register_notifier(struct icnss_priv *priv)
 		icnss_pr_err("Modem register notifier failed: %d\n", ret);
 	}
 
-	set_bit(ICNSS_SSR_ENABLED, &priv->state);
+	set_bit(ICNSS_SSR_REGISTERED, &priv->state);
 
 	return ret;
 }
 
 static int icnss_modem_ssr_unregister_notifier(struct icnss_priv *priv)
 {
-	if (!test_and_clear_bit(ICNSS_SSR_ENABLED, &priv->state))
+	if (!test_and_clear_bit(ICNSS_SSR_REGISTERED, &priv->state))
 		return 0;
 
 	subsys_notif_unregister_notifier(priv->modem_notify_handler,
@@ -2409,7 +2423,7 @@ static int icnss_pdr_unregister_notifier(struct icnss_priv *priv)
 {
 	int i;
 
-	if (!test_and_clear_bit(ICNSS_PDR_ENABLED, &priv->state))
+	if (!test_and_clear_bit(ICNSS_PDR_REGISTERED, &priv->state))
 		return 0;
 
 	for (i = 0; i < priv->total_domains; i++)
@@ -2533,9 +2547,10 @@ static int icnss_get_service_location_notify(struct notifier_block *nb,
 	priv->service_notifier = notifier;
 	priv->total_domains = pd->total_domains;
 
-	set_bit(ICNSS_PDR_ENABLED, &priv->state);
+	set_bit(ICNSS_PDR_REGISTERED, &priv->state);
 
-	icnss_pr_dbg("PD restart enabled, state: 0x%lx\n", priv->state);
+	icnss_pr_dbg("PD notification registration happened, state: 0x%lx\n",
+		     priv->state);
 
 	return NOTIFY_OK;
 
@@ -3190,7 +3205,7 @@ int icnss_trigger_recovery(struct device *dev)
 		goto out;
 	}
 
-	if (!test_bit(ICNSS_PDR_ENABLED, &priv->state)) {
+	if (!test_bit(ICNSS_PDR_REGISTERED, &priv->state)) {
 		icnss_pr_err("PD restart not enabled to trigger recovery: state: 0x%lx\n",
 			     priv->state);
 		ret = -EOPNOTSUPP;
@@ -3644,11 +3659,11 @@ static int icnss_stats_show_state(struct seq_file *s, struct icnss_priv *priv)
 		case ICNSS_PM_SUSPEND_NOIRQ:
 			seq_puts(s, "PM SUSPEND NOIRQ");
 			continue;
-		case ICNSS_SSR_ENABLED:
-			seq_puts(s, "SSR ENABLED");
+		case ICNSS_SSR_REGISTERED:
+			seq_puts(s, "SSR REGISTERED");
 			continue;
-		case ICNSS_PDR_ENABLED:
-			seq_puts(s, "PDR ENABLED");
+		case ICNSS_PDR_REGISTERED:
+			seq_puts(s, "PDR REGISTERED");
 			continue;
 		case ICNSS_PD_RESTART:
 			seq_puts(s, "PD RESTART");
@@ -3971,6 +3986,9 @@ static ssize_t icnss_regread_write(struct file *fp, const char __user *user_buf,
 	    data_len > QMI_WLFW_MAX_DATA_SIZE_V01)
 		return -EINVAL;
 
+	kfree(priv->diag_reg_read_buf);
+	priv->diag_reg_read_buf = NULL;
+
 	reg_buf = kzalloc(data_len, GFP_KERNEL);
 	if (!reg_buf)
 		return -ENOMEM;
@@ -4004,12 +4022,13 @@ static const struct file_operations icnss_regread_fops = {
 	.llseek         = seq_lseek,
 };
 
+#ifdef CONFIG_ICNSS_DEBUG
 static int icnss_debugfs_create(struct icnss_priv *priv)
 {
 	int ret = 0;
 	struct dentry *root_dentry;
 
-	root_dentry = debugfs_create_dir("icnss", 0);
+	root_dentry = debugfs_create_dir("icnss", NULL);
 
 	if (IS_ERR(root_dentry)) {
 		ret = PTR_ERR(root_dentry);
@@ -4019,19 +4038,40 @@ static int icnss_debugfs_create(struct icnss_priv *priv)
 
 	priv->root_dentry = root_dentry;
 
-	debugfs_create_file("fw_debug", 0644, root_dentry, priv,
+	debugfs_create_file("fw_debug", 0600, root_dentry, priv,
 			    &icnss_fw_debug_fops);
 
-	debugfs_create_file("stats", 0644, root_dentry, priv,
+	debugfs_create_file("stats", 0600, root_dentry, priv,
 			    &icnss_stats_fops);
 	debugfs_create_file("reg_read", 0600, root_dentry, priv,
 			    &icnss_regread_fops);
-	debugfs_create_file("reg_write", 0644, root_dentry, priv,
+	debugfs_create_file("reg_write", 0600, root_dentry, priv,
 			    &icnss_regwrite_fops);
 
 out:
 	return ret;
 }
+#else
+static int icnss_debugfs_create(struct icnss_priv *priv)
+{
+	int ret = 0;
+	struct dentry *root_dentry;
+
+	root_dentry = debugfs_create_dir("icnss", NULL);
+
+	if (IS_ERR(root_dentry)) {
+		ret = PTR_ERR(root_dentry);
+		icnss_pr_err("Unable to create debugfs %d\n", ret);
+		return ret;
+	}
+
+	priv->root_dentry = root_dentry;
+
+	debugfs_create_file("stats", 0600, root_dentry, priv,
+			    &icnss_stats_fops);
+	return 0;
+}
+#endif
 
 static void icnss_debugfs_destroy(struct icnss_priv *priv)
 {
@@ -4237,6 +4277,11 @@ static int icnss_probe(struct platform_device *pdev)
 
 	icnss_debugfs_create(priv);
 
+	ret = device_init_wakeup(&priv->pdev->dev, true);
+	if (ret)
+		icnss_pr_err("Failed to init platform device wakeup source, err = %d\n",
+			     ret);
+
 	penv = priv;
 
 	icnss_pr_info("Platform driver probed successfully\n");
@@ -4256,6 +4301,8 @@ out:
 static int icnss_remove(struct platform_device *pdev)
 {
 	icnss_pr_info("Removing driver: state: 0x%lx\n", penv->state);
+
+	device_init_wakeup(&penv->pdev->dev, false);
 
 	icnss_debugfs_destroy(penv);
 

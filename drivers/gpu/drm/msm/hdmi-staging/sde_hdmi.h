@@ -23,6 +23,7 @@
 
 #include <drm/drmP.h>
 #include <drm/drm_crtc.h>
+#include <media/cec-notifier.h>
 #include "hdmi.h"
 
 #include "sde_edid_parser.h"
@@ -86,6 +87,8 @@ struct sde_hdmi_ctrl {
  * @hpd_work:         HPD work structure.
  * @codec_ready:      If audio codec is ready.
  * @client_notify_pending: If there is client notification pending.
+ * @irq_domain:       IRQ domain structure.
+ * @notifier:         CEC notifider to convey physical address information.
  * @root:             Debug fs root entry.
  */
 struct sde_hdmi {
@@ -113,6 +116,9 @@ struct sde_hdmi {
 	struct work_struct hpd_work;
 	bool codec_ready;
 	bool client_notify_pending;
+
+	struct irq_domain *irq_domain;
+	struct cec_notifier *notifier;
 
 	/* DEBUG FS */
 	struct dentry *root;

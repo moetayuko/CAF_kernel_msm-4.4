@@ -34,10 +34,15 @@ static inline void __user *to_user_ptr(u64 address)
 }
 
 static struct msm_gem_submit *submit_create(struct drm_device *dev,
-		struct msm_gem_address_space *aspace, int nr)
+		struct msm_gem_address_space *aspace,
+		uint32_t nr_bos, uint32_t nr_cmds)
 {
 	struct msm_gem_submit *submit;
-	int sz = sizeof(*submit) + (nr * sizeof(submit->bos[0]));
+	uint64_t sz = sizeof(*submit) + (nr_bos * sizeof(submit->bos[0])) +
+		(nr_cmds * sizeof(submit->cmd[0]));
+
+	if (sz > SIZE_MAX)
+		return NULL;
 
 	submit = kmalloc(sz, GFP_TEMPORARY | __GFP_NOWARN | __GFP_NORETRY);
 	if (submit) {
@@ -50,6 +55,8 @@ static struct msm_gem_submit *submit_create(struct drm_device *dev,
 
 		submit->profile_buf_vaddr = NULL;
 		submit->profile_buf_iova = 0;
+		submit->cmd = (void *)&submit->bos[nr_bos];
+
 		submit->secure = false;
 
 		INIT_LIST_HEAD(&submit->bo_list);
@@ -210,9 +217,21 @@ retry:
 			submit->bos[i].flags |= BO_LOCKED;
 		}
 
+		/*
+		 * An invalid SVM object is part of
+		 * this submit's buffer list, fail.
+		 */
+		if (msm_obj->flags & MSM_BO_SVM) {
+			struct msm_gem_svm_object *msm_svm_obj =
+				to_msm_svm_obj(msm_obj);
+			if (msm_svm_obj->invalid) {
+				ret = -EINVAL;
+				goto fail;
+			}
+		}
 
 		/* if locking succeeded, pin bo: */
-		ret = msm_gem_get_iova_locked(&msm_obj->base, aspace, &iova);
+		ret = msm_gem_get_iova(&msm_obj->base, aspace, &iova);
 
 		/* this would break the logic in the fail path.. there is no
 		 * reason for this to happen, but just to be on the safe side
@@ -300,7 +319,7 @@ static int submit_reloc(struct msm_gem_submit *submit, struct msm_gem_object *ob
 	/* For now, just map the entire thing.  Eventually we probably
 	 * to do it page-by-page, w/ kmap() if not vmap()d..
 	 */
-	ptr = msm_gem_vaddr_locked(&obj->base);
+	ptr = msm_gem_vaddr(&obj->base);
 
 	if (IS_ERR(ptr)) {
 		ret = PTR_ERR(ptr);
@@ -393,12 +412,9 @@ int msm_ioctl_gem_submit(struct drm_device *dev, void *data,
 	if (!gpu)
 		return -ENXIO;
 
-	if (args->nr_cmds > MAX_CMDS)
-		return -EINVAL;
-
 	mutex_lock(&dev->struct_mutex);
 
-	submit = submit_create(dev, ctx->aspace, args->nr_bos);
+	submit = submit_create(dev, ctx->aspace, args->nr_bos, args->nr_cmds);
 	if (!submit) {
 		ret = -ENOMEM;
 		goto out;
@@ -466,7 +482,7 @@ int msm_ioctl_gem_submit(struct drm_device *dev, void *data,
 		if (submit_cmd.type == MSM_SUBMIT_CMD_PROFILE_BUF) {
 			submit->profile_buf_iova = submit->cmd[i].iova;
 			submit->profile_buf_vaddr =
-				msm_gem_vaddr_locked(&msm_obj->base);
+				msm_gem_vaddr(&msm_obj->base);
 		}
 
 		if (submit->valid)
