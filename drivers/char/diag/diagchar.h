@@ -535,7 +535,6 @@ struct diagchar_dev {
 	struct mutex cmd_reg_mutex;
 	uint32_t cmd_reg_count;
 	struct mutex diagfwd_channel_mutex[NUM_PERIPHERALS];
-	struct mutex diagfwd_untag_mutex;
 	/* Sizes that reflect memory pool sizes */
 	unsigned int poolsize;
 	unsigned int poolsize_hdlc;
@@ -600,8 +599,6 @@ struct diagchar_dev {
 	int logging_mask;
 	int pd_logging_mode;
 	int num_pd_session;
-	int cpd_len_1;
-	int cpd_len_2;
 	int mask_check;
 	uint32_t md_session_mask;
 	uint8_t md_session_mode;
