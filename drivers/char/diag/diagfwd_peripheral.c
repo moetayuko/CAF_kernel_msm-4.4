@@ -353,7 +353,6 @@ static void diagfwd_data_read_untag_done(struct diagfwd_info *fwd_info,
 	if (driver->feature[fwd_info->peripheral].encode_hdlc &&
 		driver->feature[fwd_info->peripheral].untag_header &&
 		driver->peripheral_untag[fwd_info->peripheral]) {
-		mutex_lock(&driver->diagfwd_untag_mutex);
 		temp_buf_cpd = buf;
 		temp_buf_main = buf;
 		if (fwd_info->buf_1 &&
@@ -409,10 +408,10 @@ static void diagfwd_data_read_untag_done(struct diagfwd_info *fwd_info,
 		}
 		if (len_cpd) {
 			if (flag_buf_1) {
-				driver->cpd_len_1 = len_cpd;
+				fwd_info->cpd_len_1 = len_cpd;
 				temp_ptr_cpd = fwd_info->buf_1;
 			} else {
-				driver->cpd_len_2 = len_cpd;
+				fwd_info->cpd_len_2 = len_cpd;
 				temp_ptr_cpd = fwd_info->buf_2;
 			}
 			temp_ptr_cpd->ctxt &= 0x00FFFFFF;
@@ -422,11 +421,10 @@ static void diagfwd_data_read_untag_done(struct diagfwd_info *fwd_info,
 				temp_ptr_cpd, len_cpd);
 		} else {
 			if (flag_buf_1)
-				driver->cpd_len_1 = 0;
+				fwd_info->cpd_len_1 = 0;
 			if (flag_buf_2)
-				driver->cpd_len_2 = 0;
+				fwd_info->cpd_len_2 = 0;
 		}
-		mutex_unlock(&driver->diagfwd_untag_mutex);
 	} else {
 		diagfwd_data_read_done(fwd_info, buf, len);
 	}
@@ -1167,17 +1165,17 @@ void diagfwd_write_done(uint8_t peripheral, uint8_t type, int ctxt)
 	fwd_info = &peripheral_info[type][peripheral];
 	if (ctxt == 1 && fwd_info->buf_1) {
 		atomic_set(&fwd_info->buf_1->in_busy, 0);
-		driver->cpd_len_1 = 0;
+		fwd_info->cpd_len_1 = 0;
 	} else if (ctxt == 2 && fwd_info->buf_2) {
 		atomic_set(&fwd_info->buf_2->in_busy, 0);
-		driver->cpd_len_2 = 0;
+		fwd_info->cpd_len_2 = 0;
 	} else if (ctxt == 3 && fwd_info->buf_upd_1_a) {
 		atomic_set(&fwd_info->buf_upd_1_a->in_busy, 0);
-		if (driver->cpd_len_1 == 0)
+		if (fwd_info->cpd_len_1 == 0)
 			atomic_set(&fwd_info->buf_1->in_busy, 0);
 	} else if (ctxt == 4 && fwd_info->buf_upd_1_b) {
 		atomic_set(&fwd_info->buf_upd_1_b->in_busy, 0);
-		if (driver->cpd_len_2 == 0)
+		if (fwd_info->cpd_len_2 == 0)
 			atomic_set(&fwd_info->buf_2->in_busy, 0);
 	} else
 		pr_err("diag: In %s, invalid ctxt %d\n", __func__, ctxt);
