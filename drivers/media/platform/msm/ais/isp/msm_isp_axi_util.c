@@ -2047,6 +2047,7 @@ static int msm_isp_process_done_buf(struct vfe_device *vfe_dev,
 		vfe_dev->fetch_engine_info.is_busy = 0;
 	}
 
+	uint32_t event_id = (stream_info->session_id << 8) | stream_info->stream_id;
 	if (stream_info->buf_divert &&
 		buf_src != MSM_ISP_BUFFER_SRC_SCRATCH) {
 
@@ -2058,17 +2059,19 @@ static int msm_isp_process_done_buf(struct vfe_device *vfe_dev,
 			return -EINVAL;
 		}
 		if ((bufq != NULL) && bufq->buf_type == ISP_SHARE_BUF)
-			msm_isp_send_event(vfe_dev->common_data->
+			msm_isp_send_buffer_event(vfe_dev->common_data->
 				dual_vfe_res->vfe_dev[ISP_VFE1],
-				ISP_EVENT_BUF_DIVERT, &buf_event);
+				ISP_EVENT_BUF_DIVERT, event_id, &buf_event);
+
 		else
-			msm_isp_send_event(vfe_dev,
-			ISP_EVENT_BUF_DIVERT, &buf_event);
+			msm_isp_send_buffer_event(vfe_dev,
+			ISP_EVENT_BUF_DIVERT, event_id, &buf_event);
+
 	} else {
 		ISP_DBG("%s: vfe_id %d send buf done buf-id %d bufq %x\n",
 			__func__, vfe_dev->pdev->id, buf->buf_idx,
 			buf->bufq_handle);
-		msm_isp_send_event(vfe_dev, ISP_EVENT_BUF_DONE,
+		msm_isp_send_buffer_event(vfe_dev, ISP_EVENT_BUF_DONE,event_id,
 			&buf_event);
 		buf->buf_debug.put_state[
 			buf->buf_debug.put_state_last] =
@@ -3130,6 +3133,9 @@ static int msm_isp_stop_axi_stream(struct vfe_device *vfe_dev,
 					ISP_EVENT_BUF_FATAL_ERROR);
 				return rc;
 			}
+
+			//uint32_t event_id = (stream_info->session_id << 8) | stream_info->stream_id;
+			//msm_isp_clear_event(vfe_dev, ISP_EVENT_BUF_DIVERT, event_id);
 
 		}
 		vfe_dev->reg_update_requested &=
