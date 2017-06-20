@@ -1549,6 +1549,22 @@ int msm_isp_send_event(struct vfe_device *vfe_dev,
 	return 0;
 }
 
+int msm_isp_send_buffer_event(struct vfe_device *vfe_dev,
+	uint32_t event_type, uint32_t id,
+	struct msm_isp_event_data *event_data)
+{
+	struct v4l2_event isp_event;
+
+	memset(&isp_event, 0, sizeof(struct v4l2_event));
+	isp_event.id = id;
+	isp_event.type = event_type;
+
+	memcpy(&isp_event.u.data[0], event_data,
+		sizeof(struct msm_isp_event_data));
+	v4l2_event_queue(vfe_dev->subdev.sd.devnode, &isp_event);
+	return 0;
+}
+
 #define CAL_WORD(width, M, N) ((width * M + N - 1) / N)
 
 int msm_isp_cal_word_per_line(uint32_t output_format,
