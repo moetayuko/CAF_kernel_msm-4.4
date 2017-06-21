@@ -102,6 +102,13 @@ struct drm_msm_gem_new {
 	__u32 handle;         /* out */
 };
 
+struct drm_msm_gem_svm_new {
+	__u64 hostptr;        /* in, must be page-aligned */
+	__u64 size;           /* in, must be page-aligned */
+	__u32 flags;          /* in, mask of MSM_BO_x */
+	__u32 handle;         /* out */
+};
+
 #define MSM_INFO_IOVA	0x01
 
 #define MSM_INFO_FLAGS (MSM_INFO_IOVA)
@@ -218,11 +225,13 @@ struct drm_msm_gem_submit {
 	__u32 nr_cmds;        /* in, number of submit_cmd's */
 	__u64 __user bos;     /* in, ptr to array of submit_bo's */
 	__u64 __user cmds;    /* in, ptr to array of submit_cmd's */
+	__s32 fence_fd;       /* gap for the fence_fd which is upstream */
+	__u32 queueid;         /* in, submitqueue id */
 };
 
 struct drm_msm_gem_submit_profile_buffer {
-	__s64 queue_time;      /* out, Ringbuffer queue time (seconds) */
-	__s64 submit_time;     /* out, Ringbuffer submission time (seconds) */
+	__s64 queue_time;      /* out, Ringbuffer queue time (nsecs) */
+	__s64 submit_time;     /* out, Ringbuffer submission time (nsecs) */
 	__u64 ticks_queued;    /* out, GPU ticks at ringbuffer submission */
 	__u64 ticks_submitted; /* out, GPU ticks before cmdstream execution*/
 	__u64 ticks_retired;   /* out, GPU ticks after cmdstream execution */
@@ -346,6 +355,21 @@ struct drm_msm_gem_sync {
 	__u64 __user ops;
 };
 
+/*
+ * Draw queues allow the user to set specific submission parameter. Command
+ * submissions will specify a specific submit queue id to use. id '0' is
+ * reserved as a "default" drawqueue with medium priority. The user can safely
+ * use and query 0 but cannot destroy it.
+ */
+
+#define MSM_SUBMITQUEUE_FLAGS (0)
+
+struct drm_msm_submitqueue {
+	__u32 flags;   /* in, MSM_SUBMITQUEUE_x */
+	__u32 prio;    /* in, Priority level */
+	__u32 id;      /* out, identifier */
+};
+
 #define DRM_MSM_GET_PARAM              0x00
 /* placeholder:
 #define DRM_MSM_SET_PARAM              0x01
@@ -356,6 +380,10 @@ struct drm_msm_gem_sync {
 #define DRM_MSM_GEM_CPU_FINI           0x05
 #define DRM_MSM_GEM_SUBMIT             0x06
 #define DRM_MSM_WAIT_FENCE             0x07
+/* Gap for upstream DRM_MSM_GEM_MADVISE */
+#define DRM_MSM_GEM_SVM_NEW            0x09
+#define DRM_MSM_SUBMITQUEUE_NEW        0x0A
+#define DRM_MSM_SUBMITQUEUE_CLOSE      0x0B
 
 #define DRM_SDE_WB_CONFIG              0x40
 #define DRM_MSM_REGISTER_EVENT         0x41
@@ -395,6 +423,15 @@ struct drm_msm_gem_sync {
 		struct drm_msm_counter_read)
 #define DRM_IOCTL_MSM_GEM_SYNC DRM_IOW(DRM_COMMAND_BASE + DRM_MSM_GEM_SYNC,\
 		struct drm_msm_gem_sync)
+#define DRM_IOCTL_MSM_GEM_SVM_NEW \
+	DRM_IOWR(DRM_COMMAND_BASE + DRM_MSM_GEM_SVM_NEW, \
+		struct drm_msm_gem_svm_new)
+#define DRM_IOCTL_MSM_SUBMITQUEUE_NEW \
+	DRM_IOWR(DRM_COMMAND_BASE + DRM_MSM_SUBMITQUEUE_NEW, \
+		struct drm_msm_submitqueue)
+#define DRM_IOCTL_MSM_SUBMITQUEUE_CLOSE \
+	DRM_IOW(DRM_COMMAND_BASE + DRM_MSM_SUBMITQUEUE_CLOSE, \
+		struct drm_msm_submitqueue)
 
 #if defined(__cplusplus)
 }

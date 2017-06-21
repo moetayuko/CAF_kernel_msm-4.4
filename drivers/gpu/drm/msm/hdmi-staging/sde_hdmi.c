@@ -23,11 +23,13 @@
 #include <linux/gpio.h>
 #include <linux/of_irq.h>
 #include <linux/of_platform.h>
+#include <linux/irqdomain.h>
 
 #include "sde_kms.h"
 #include "sde_connector.h"
 #include "msm_drv.h"
 #include "sde_hdmi.h"
+#include "sde_hdmi_regs.h"
 
 static DEFINE_MUTEX(sde_hdmi_list_lock);
 static LIST_HEAD(sde_hdmi_list);
@@ -47,6 +49,9 @@ static LIST_HEAD(sde_hdmi_list);
 #define HDMI_SCDC_ERR_DET_2_L           0x54
 #define HDMI_SCDC_ERR_DET_2_H           0x55
 #define HDMI_SCDC_ERR_DET_CHECKSUM      0x56
+
+#define HDMI_DISPLAY_MAX_WIDTH          4096
+#define HDMI_DISPLAY_MAX_HEIGHT         2160
 
 static const struct of_device_id sde_hdmi_dt_match[] = {
 	{.compatible = "qcom,hdmi-display"},
@@ -906,6 +911,27 @@ static void _sde_hdmi_hdp_disable(struct sde_hdmi *sde_hdmi)
 	}
 }
 
+static void _sde_hdmi_cec_update_phys_addr(struct sde_hdmi *display)
+{
+	struct edid *edid = display->edid_ctrl->edid;
+
+	if (edid)
+		cec_notifier_set_phys_addr_from_edid(display->notifier, edid);
+	else
+		cec_notifier_set_phys_addr(display->notifier,
+			CEC_PHYS_ADDR_INVALID);
+}
+
+static void _sde_hdmi_map_regs(struct sde_hdmi *display, struct hdmi *hdmi)
+{
+	display->io[HDMI_TX_CORE_IO].base = hdmi->mmio;
+	display->io[HDMI_TX_CORE_IO].len = hdmi->mmio_len;
+	display->io[HDMI_TX_QFPROM_IO].base = hdmi->qfprom_mmio;
+	display->io[HDMI_TX_QFPROM_IO].len = hdmi->qfprom_mmio_len;
+	display->io[HDMI_TX_HDCP_IO].base = hdmi->hdcp_mmio;
+	display->io[HDMI_TX_HDCP_IO].len = hdmi->hdcp_mmio_len;
+}
+
 static void _sde_hdmi_hotplug_work(struct work_struct *work)
 {
 	struct sde_hdmi *sde_hdmi =
@@ -935,6 +961,7 @@ static void _sde_hdmi_hotplug_work(struct work_struct *work)
 		sde_free_edid((void **)&sde_hdmi->edid_ctrl);
 
 	drm_helper_hpd_irq_event(connector->dev);
+	_sde_hdmi_cec_update_phys_addr(sde_hdmi);
 }
 
 static void _sde_hdmi_connector_irq(struct sde_hdmi *sde_hdmi)
@@ -967,6 +994,18 @@ static void _sde_hdmi_connector_irq(struct sde_hdmi *sde_hdmi)
 	}
 }
 
+static void _sde_hdmi_cec_irq(struct sde_hdmi *sde_hdmi)
+{
+	struct hdmi *hdmi = sde_hdmi->ctrl.ctrl;
+	u32 cec_intr = hdmi_read(hdmi, REG_HDMI_CEC_INT);
+
+	/* Routing interrupt to external CEC drivers */
+	if (cec_intr)
+		generic_handle_irq(irq_find_mapping(
+				sde_hdmi->irq_domain, 1));
+}
+
+
 static irqreturn_t _sde_hdmi_irq(int irq, void *dev_id)
 {
 	struct sde_hdmi *sde_hdmi = dev_id;
@@ -987,7 +1026,8 @@ static irqreturn_t _sde_hdmi_irq(int irq, void *dev_id)
 	if (hdmi->hdcp_ctrl && hdmi->is_hdcp_supported)
 		hdmi_hdcp_ctrl_irq(hdmi->hdcp_ctrl);
 
-	/* TODO audio.. */
+	/* Process CEC: */
+	_sde_hdmi_cec_irq(sde_hdmi);
 
 	return IRQ_HANDLED;
 }
@@ -1428,8 +1468,8 @@ int sde_hdmi_get_info(struct msm_display_info *info,
 				MSM_DISPLAY_CAP_EDID | MSM_DISPLAY_CAP_VID_MODE;
 	}
 	info->is_connected = hdmi_display->connected;
-	info->max_width = 4096;
-	info->max_height = 2160;
+	info->max_width = HDMI_DISPLAY_MAX_WIDTH;
+	info->max_height = HDMI_DISPLAY_MAX_HEIGHT;
 	info->compression = MSM_DISPLAY_COMPRESS_NONE;
 
 	mutex_unlock(&hdmi_display->display_lock);
@@ -1511,6 +1551,86 @@ int sde_hdmi_connector_pre_deinit(struct drm_connector *connector,
 	return 0;
 }
 
+static void _sde_hdmi_get_tx_version(struct sde_hdmi *sde_hdmi)
+{
+	struct hdmi *hdmi = sde_hdmi->ctrl.ctrl;
+
+	sde_hdmi->hdmi_tx_version = hdmi_read(hdmi, REG_HDMI_VERSION);
+	sde_hdmi->hdmi_tx_major_version =
+		SDE_GET_MAJOR_VER(sde_hdmi->hdmi_tx_version);
+
+	switch (sde_hdmi->hdmi_tx_major_version) {
+	case (HDMI_TX_VERSION_3):
+		sde_hdmi->max_pclk_khz = HDMI_TX_3_MAX_PCLK_RATE;
+		break;
+	case (HDMI_TX_VERSION_4):
+		sde_hdmi->max_pclk_khz = HDMI_TX_4_MAX_PCLK_RATE;
+		break;
+	default:
+		sde_hdmi->max_pclk_khz = HDMI_DEFAULT_MAX_PCLK_RATE;
+		break;
+	}
+	SDE_DEBUG("sde_hdmi->hdmi_tx_version = 0x%x\n",
+		sde_hdmi->hdmi_tx_version);
+	SDE_DEBUG("sde_hdmi->hdmi_tx_major_version = 0x%x\n",
+		sde_hdmi->hdmi_tx_major_version);
+	SDE_DEBUG("sde_hdmi->max_pclk_khz = 0x%x\n",
+		sde_hdmi->max_pclk_khz);
+}
+
+static int sde_hdmi_tx_check_capability(struct sde_hdmi *sde_hdmi)
+{
+	u32 hdmi_disabled, hdcp_disabled, reg_val;
+	int ret = 0;
+	struct hdmi *hdmi = sde_hdmi->ctrl.ctrl;
+
+	/* check if hdmi and hdcp are disabled */
+	if (sde_hdmi->hdmi_tx_major_version < HDMI_TX_VERSION_4) {
+		hdcp_disabled = hdmi_qfprom_read(hdmi,
+		QFPROM_RAW_FEAT_CONFIG_ROW0_LSB) & BIT(31);
+
+		hdmi_disabled = hdmi_qfprom_read(hdmi,
+		QFPROM_RAW_FEAT_CONFIG_ROW0_MSB) & BIT(0);
+	} else {
+		reg_val = hdmi_qfprom_read(hdmi,
+		QFPROM_RAW_FEAT_CONFIG_ROW0_LSB + QFPROM_RAW_VERSION_4);
+		hdcp_disabled = reg_val & BIT(12);
+
+		hdmi_disabled = reg_val & BIT(13);
+
+		reg_val = hdmi_qfprom_read(hdmi, SEC_CTRL_HW_VERSION);
+
+		SDE_DEBUG("SEC_CTRL_HW_VERSION reg_val = 0x%x\n", reg_val);
+		/*
+		 * With HDCP enabled on capable hardware, check if HW
+		 * or SW keys should be used.
+		 */
+		if (!hdcp_disabled && (reg_val >= HDCP_SEL_MIN_SEC_VERSION)) {
+			reg_val = hdmi_qfprom_read(hdmi,
+			QFPROM_RAW_FEAT_CONFIG_ROW0_MSB +
+			QFPROM_RAW_VERSION_4);
+
+			if (!(reg_val & BIT(23)))
+				sde_hdmi->hdcp1_use_sw_keys = true;
+		}
+	}
+
+	SDE_DEBUG("%s: Features <HDMI:%s, HDCP:%s>\n", __func__,
+			hdmi_disabled ? "OFF" : "ON",
+			hdcp_disabled ? "OFF" : "ON");
+
+	if (hdmi_disabled) {
+		DEV_ERR("%s: HDMI disabled\n", __func__);
+		ret = -ENODEV;
+		goto end;
+	}
+
+	sde_hdmi->hdcp14_present = !hdcp_disabled;
+
+ end:
+	return ret;
+} /* hdmi_tx_check_capability */
+
 int sde_hdmi_connector_post_init(struct drm_connector *connector,
 		void *info,
 		void *display)
@@ -1543,6 +1663,8 @@ int sde_hdmi_connector_post_init(struct drm_connector *connector,
 	if (rc)
 		SDE_ERROR("failed to enable HPD: %d\n", rc);
 
+	_sde_hdmi_get_tx_version(sde_hdmi);
+	sde_hdmi_tx_check_capability(sde_hdmi);
 	return rc;
 }
 
@@ -1659,8 +1781,26 @@ int sde_hdmi_dev_deinit(struct sde_hdmi *display)
 		SDE_ERROR("Invalid params\n");
 		return -EINVAL;
 	}
+	return 0;
+}
+
+static int _sde_hdmi_cec_init(struct sde_hdmi *display)
+{
+	struct platform_device *pdev = display->pdev;
+
+	display->notifier = cec_notifier_get(&pdev->dev);
+	if (!display->notifier) {
+		SDE_ERROR("CEC notifier get failed\n");
+		return -ENOMEM;
+	}
 
 	return 0;
+}
+
+static void _sde_hdmi_cec_deinit(struct sde_hdmi *display)
+{
+	cec_notifier_set_phys_addr(display->notifier, CEC_PHYS_ADDR_INVALID);
+	cec_notifier_put(display->notifier);
 }
 
 static int sde_hdmi_bind(struct device *dev, struct device *master, void *data)
@@ -1701,7 +1841,14 @@ static int sde_hdmi_bind(struct device *dev, struct device *master, void *data)
 	if (rc) {
 		SDE_ERROR("[%s]Ext Disp init failed, rc=%d\n",
 				display->name, rc);
-		goto error;
+		goto ext_error;
+	}
+
+	rc = _sde_hdmi_cec_init(display);
+	if (rc) {
+		SDE_ERROR("[%s]CEC init failed, rc=%d\n",
+				display->name, rc);
+		goto ext_error;
 	}
 
 	display->edid_ctrl = sde_edid_init();
@@ -1709,16 +1856,21 @@ static int sde_hdmi_bind(struct device *dev, struct device *master, void *data)
 		SDE_ERROR("[%s]sde edid init failed\n",
 				display->name);
 		rc = -ENOMEM;
-		goto error;
+		goto cec_error;
 	}
 
 	display_ctrl = &display->ctrl;
 	display_ctrl->ctrl = priv->hdmi;
 	display->drm_dev = drm;
 
+	_sde_hdmi_map_regs(display, priv->hdmi);
+
 	mutex_unlock(&display->display_lock);
 	return rc;
-error:
+
+cec_error:
+	(void)_sde_hdmi_cec_deinit(display);
+ext_error:
 	(void)_sde_hdmi_debugfs_deinit(display);
 debug_error:
 	mutex_unlock(&display->display_lock);
@@ -1744,6 +1896,7 @@ static void sde_hdmi_unbind(struct device *dev, struct device *master,
 	mutex_lock(&display->display_lock);
 	(void)_sde_hdmi_debugfs_deinit(display);
 	(void)sde_edid_deinit((void **)&display->edid_ctrl);
+	(void)_sde_hdmi_cec_deinit(display);
 	display->drm_dev = NULL;
 	mutex_unlock(&display->display_lock);
 }
@@ -2017,6 +2170,29 @@ static struct platform_driver sde_hdmi_driver = {
 	},
 };
 
+static int sde_hdmi_irqdomain_map(struct irq_domain *domain,
+		unsigned int irq, irq_hw_number_t hwirq)
+{
+	struct sde_hdmi *display;
+	int rc;
+
+	if (!domain || !domain->host_data) {
+		pr_err("invalid parameters domain\n");
+		return -EINVAL;
+	}
+	display = domain->host_data;
+
+	irq_set_chip_and_handler(irq, &dummy_irq_chip, handle_level_irq);
+	rc = irq_set_chip_data(irq, display);
+
+	return rc;
+}
+
+static const struct irq_domain_ops sde_hdmi_irqdomain_ops = {
+	.map = sde_hdmi_irqdomain_map,
+	.xlate = irq_domain_xlate_onecell,
+};
+
 int sde_hdmi_drm_init(struct sde_hdmi *display, struct drm_encoder *enc)
 {
 	int rc = 0;
@@ -2071,6 +2247,13 @@ int sde_hdmi_drm_init(struct sde_hdmi *display, struct drm_encoder *enc)
 		goto error;
 	}
 
+	display->irq_domain = irq_domain_add_linear(pdev->dev.of_node, 8,
+				&sde_hdmi_irqdomain_ops, display);
+	if (!display->irq_domain) {
+		SDE_ERROR("failed to create IRQ domain\n");
+		goto error;
+	}
+
 	enc->bridge = hdmi->bridge;
 	priv->bridges[priv->num_bridges++] = hdmi->bridge;
 
@@ -2095,6 +2278,9 @@ int sde_hdmi_drm_deinit(struct sde_hdmi *display)
 		SDE_ERROR("Invalid params\n");
 		return -EINVAL;
 	}
+
+	if (display->irq_domain)
+		irq_domain_remove(display->irq_domain);
 
 	return rc;
 }

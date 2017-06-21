@@ -263,8 +263,6 @@ static void a5xx_submit(struct msm_gpu *gpu, struct msm_gem_submit *submit)
 
 		local_irq_restore(flags);
 
-		do_div(ktime, NSEC_PER_SEC);
-
 		profile_buf->queue_time = ktime;
 		profile_buf->submit_time = ktime;
 	}
@@ -483,10 +481,8 @@ static struct drm_gem_object *a5xx_ucode_load_bo(struct msm_gpu *gpu,
 	struct drm_gem_object *bo;
 	void *ptr;
 
-	mutex_lock(&drm->struct_mutex);
 	bo = msm_gem_new(drm, fw->size - 4,
 		MSM_BO_UNCACHED | MSM_BO_GPU_READONLY);
-	mutex_unlock(&drm->struct_mutex);
 
 	if (IS_ERR(bo))
 		return bo;
@@ -1410,8 +1406,8 @@ struct msm_gpu *a5xx_gpu_init(struct drm_device *dev)
 	 * Set the user domain range to fall into the TTBR1 region for global
 	 * objects
 	 */
-	a5xx_config.va_start = 0x800000000;
-	a5xx_config.va_end = 0x8ffffffff;
+	a5xx_config.va_start = 0xfffffff000000000ULL;
+	a5xx_config.va_end = 0xffffffffffffffffULL;
 
 	a5xx_config.secure_va_start = SECURE_VA_START;
 	a5xx_config.secure_va_end = SECURE_VA_START + SECURE_VA_SIZE - 1;

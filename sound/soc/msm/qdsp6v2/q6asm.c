@@ -1063,14 +1063,12 @@ void q6asm_audio_client_free(struct audio_client *ac)
 	}
 
 	rtac_set_asm_handle(ac->session, NULL);
-	if (!atomic_read(&ac->reset)) {
-		apr_deregister(ac->apr2);
-		apr_deregister(ac->apr);
-		q6asm_mmap_apr_dereg();
-		ac->apr2 = NULL;
-		ac->apr = NULL;
-		ac->mmap_apr = NULL;
-	}
+	apr_deregister(ac->apr2);
+	apr_deregister(ac->apr);
+	q6asm_mmap_apr_dereg();
+	ac->apr2 = NULL;
+	ac->apr = NULL;
+	ac->mmap_apr = NULL;
 	q6asm_session_free(ac);
 
 	pr_debug("%s: APR De-Register\n", __func__);
@@ -1817,6 +1815,7 @@ static int32_t q6asm_callback(struct apr_client_data *data, void *priv)
 		case ASM_STREAM_CMD_OPEN_LOOPBACK_V2:
 		case ASM_STREAM_CMD_OPEN_TRANSCODE_LOOPBACK:
 		case ASM_DATA_CMD_MEDIA_FMT_UPDATE_V2:
+		case ASM_DATA_CMD_IEC_60958_MEDIA_FMT:
 		case ASM_STREAM_CMD_SET_ENCDEC_PARAM:
 		case ASM_STREAM_CMD_SET_ENCDEC_PARAM_V2:
 		case ASM_STREAM_CMD_REGISTER_ENCDEC_EVENTS:
@@ -2662,6 +2661,9 @@ int q6asm_open_write_compressed(struct audio_client *ac, uint32_t format,
 	case FORMAT_TRUEHD:
 		open.fmt_id = ASM_MEDIA_FMT_TRUEHD;
 		break;
+	case FORMAT_IEC61937:
+		open.fmt_id = ASM_MEDIA_FMT_IEC;
+		break;
 	default:
 		pr_err("%s: Invalid format[%d]\n", __func__, format);
 		rc = -EINVAL;
@@ -2677,6 +2679,10 @@ int q6asm_open_write_compressed(struct audio_client *ac, uint32_t format,
 	} else if (passthrough_flag == COMPRESSED_PASSTHROUGH_CONVERT) {
 		open.flags = 0x8;
 		pr_debug("%s: Flag 8 - COMPRESSED_PASSTHROUGH_CONVERT\n",
+			 __func__);
+	} else if (passthrough_flag == COMPRESSED_PASSTHROUGH_IEC61937) {
+		open.flags = 0x1;
+		pr_debug("%s: Flag 1 - COMPRESSED_PASSTHROUGH_IEC61937\n",
 			 __func__);
 	} else {
 		pr_err("%s: Invalid passthrough type[%d]\n",
@@ -3393,11 +3399,12 @@ int q6asm_set_shared_circ_buff(struct audio_client *ac,
 	open->shared_circ_buf_start_phy_addr_lsw =
 			lower_32_bits(buf_circ->phys);
 	open->shared_circ_buf_start_phy_addr_msw =
-			upper_32_bits(buf_circ->phys);
+			msm_audio_populate_upper_32_bits(buf_circ->phys);
 	open->shared_circ_buf_size = bufsz * bufcnt;
 
 	open->map_region_circ_buf.shm_addr_lsw = lower_32_bits(buf_circ->phys);
-	open->map_region_circ_buf.shm_addr_msw = upper_32_bits(buf_circ->phys);
+	open->map_region_circ_buf.shm_addr_msw =
+			msm_audio_populate_upper_32_bits(buf_circ->phys);
 	open->map_region_circ_buf.mem_size_bytes = bytes_to_alloc;
 
 	mutex_unlock(&ac->cmd_lock);
@@ -3439,10 +3446,12 @@ int q6asm_set_shared_pos_buff(struct audio_client *ac,
 	open->shared_pos_buf_num_regions = 1;
 	open->shared_pos_buf_property_flag = 0x00;
 	open->shared_pos_buf_phy_addr_lsw = lower_32_bits(buf_pos->phys);
-	open->shared_pos_buf_phy_addr_msw = upper_32_bits(buf_pos->phys);
+	open->shared_pos_buf_phy_addr_msw =
+			msm_audio_populate_upper_32_bits(buf_pos->phys);
 
 	open->map_region_pos_buf.shm_addr_lsw = lower_32_bits(buf_pos->phys);
-	open->map_region_pos_buf.shm_addr_msw = upper_32_bits(buf_pos->phys);
+	open->map_region_pos_buf.shm_addr_msw =
+			msm_audio_populate_upper_32_bits(buf_pos->phys);
 	open->map_region_pos_buf.mem_size_bytes = bytes_to_alloc;
 
 done:
@@ -5541,6 +5550,62 @@ fail_cmd:
 	return rc;
 }
 EXPORT_SYMBOL(q6asm_media_format_block_gen_compr);
+
+
+/*
+ * q6asm_media_format_block_iec - set up IEC61937 (compressed) or IEC60958
+ *                                (pcm) format params. Both audio standards
+ *                                use the same format and are used for
+ *                                HDMI or SPDIF.
+ *
+ * @ac: Client session handle
+ * @rate: sample rate
+ * @channels: number of channels
+ */
+int q6asm_media_format_block_iec(struct audio_client *ac,
+				uint32_t rate, uint32_t channels)
+{
+	struct asm_iec_compressed_fmt_blk_t fmt;
+	int rc = 0;
+
+	pr_debug("%s: session[%d]rate[%d]ch[%d]\n",
+		 __func__, ac->session, rate,
+		 channels);
+
+	memset(&fmt, 0, sizeof(fmt));
+	q6asm_add_hdr(ac, &fmt.hdr, sizeof(fmt), TRUE);
+
+	fmt.hdr.opcode = ASM_DATA_CMD_IEC_60958_MEDIA_FMT;
+	fmt.num_channels = channels;
+	fmt.sampling_rate = rate;
+
+	atomic_set(&ac->cmd_state, -1);
+	rc = apr_send_pkt(ac->apr, (uint32_t *) &fmt);
+	if (rc < 0) {
+		pr_err("%s: Comamnd open failed %d\n", __func__, rc);
+		rc = -EINVAL;
+		goto fail_cmd;
+	}
+	rc = wait_event_timeout(ac->cmd_wait,
+			(atomic_read(&ac->cmd_state) >= 0), 5*HZ);
+	if (!rc) {
+		pr_err("%s: timeout. waited for format update\n", __func__);
+		rc = -ETIMEDOUT;
+		goto fail_cmd;
+	}
+
+	if (atomic_read(&ac->cmd_state) > 0) {
+		pr_err("%s: DSP returned error[%s]\n",
+			__func__, adsp_err_get_err_str(
+			atomic_read(&ac->cmd_state)));
+		rc = adsp_err_get_lnx_err_code(
+				atomic_read(&ac->cmd_state));
+	}
+	return 0;
+fail_cmd:
+	return rc;
+}
+EXPORT_SYMBOL(q6asm_media_format_block_iec);
 
 static int __q6asm_media_format_block_multi_aac(struct audio_client *ac,
 				struct asm_aac_cfg *cfg, int stream_id)
