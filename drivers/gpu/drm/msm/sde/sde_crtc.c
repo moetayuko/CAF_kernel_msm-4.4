@@ -604,10 +604,9 @@ void sde_crtc_complete_commit(struct drm_crtc *crtc,
 	for (i = 0; i < cstate->num_connectors; ++i)
 		sde_connector_complete_commit(cstate->connectors[i]);
 
-	mutex_lock(&dev->mode_config.mutex);
 	if (!sde_kms->splash_info.handoff &&
 		sde_kms->splash_info.lk_is_exited) {
-
+		mutex_lock(&dev->mode_config.mutex);
 		drm_for_each_connector(conn, crtc->dev) {
 			if (conn->state->crtc != crtc)
 				continue;
@@ -616,8 +615,8 @@ void sde_crtc_complete_commit(struct drm_crtc *crtc,
 					&priv->phandle,
 					conn->connector_type);
 		}
+		mutex_unlock(&dev->mode_config.mutex);
 	}
-	mutex_unlock(&dev->mode_config.mutex);
 }
 
 /**
