@@ -480,7 +480,7 @@ void msm_vfe47_process_error_status(struct vfe_device *vfe_dev)
 		pr_err("%s: camif error status: 0x%x\n",
 			__func__, vfe_dev->error_info.camif_status);
 		/* dump camif registers on camif error */
-		msm_camera_io_dump(vfe_dev->vfe_base + 0x478, 0x3C, 1);
+		/* msm_camera_io_dump(vfe_dev->vfe_base + 0x478, 0x3C, 1); */
 		/* testgen */
 		if (vfe_dev->axi_data.src_info[VFE_PIX_0].input_mux == TESTGEN)
 			msm_camera_io_dump(vfe_dev->vfe_base + 0xC58, 0x28, 1);
