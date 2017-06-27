@@ -126,4 +126,11 @@
                 pinctrl-0 = <&ir_int>;
                 linux,rc-map-name = "rc-tvx-hd-nec";
         };
+        qcom,rmnet-ipa {
+                status = "disabled";
+        };
+};
+
+&ipa_hw {
+        status = "disabled";
 };
