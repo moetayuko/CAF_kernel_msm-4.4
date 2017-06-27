@@ -124,6 +124,6 @@
                 gpios = <&tlmm 120 1>;
                 pinctrl-names = "default";
                 pinctrl-0 = <&ir_int>;
-                linux,rc-map-name = "rc-lirc";
+                linux,rc-map-name = "rc-tvx-hd-nec";
         };
 };
