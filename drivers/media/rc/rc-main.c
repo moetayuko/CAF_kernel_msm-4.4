@@ -31,6 +31,10 @@
 /* FIXME: IR_KEYPRESS_TIMEOUT should be protocol specific */
 #define IR_KEYPRESS_TIMEOUT 250
 
+static int ir_scantokeycode(struct input_dev *idev,
+                              unsigned int scancode,
+                              unsigned int* keycode);
+
 /* Used to keep track of known keymaps */
 static LIST_HEAD(rc_map_list);
 static DEFINE_SPINLOCK(rc_map_lock);
@@ -434,6 +438,39 @@ static unsigned int ir_lookup_by_scancode(const struct rc_map *rc_map,
 	return -1U;
 }
 
+
+/**
+ * ir_scantokeycode() - get a keycode from the scancode
+ * @idev:	the struct input_dev device descriptor
+ * @scancode:	the desired scancode
+ * @keycode:	keycode, if found
+ * @return:	    returns zero for success.
+ *
+ */
+static int ir_scantokeycode(struct input_dev *idev, unsigned int scancode, unsigned int* keycode)
+{
+        struct rc_map_table *entry;
+        int index = 0;
+        struct rc_dev *rdev = input_get_drvdata(idev);
+        struct rc_map *rc_map = &rdev->rc_map;
+
+        if(rdev == NULL || rc_map == NULL){
+                printk(KERN_ERR "rc_Code : invalid input \n");
+                return -1;
+        }
+
+        index = ir_lookup_by_scancode(rc_map, scancode);
+        if(index == -1){
+                printk(KERN_ERR "rc_Code : Invalid key map index\n");
+                return -1;
+        }
+        else if (index < rc_map->len) {
+                entry = &rc_map->scan[index];
+                *keycode = entry->keycode;
+        }
+        return 0;
+}
+
 /**
  * ir_getkeycode() - get a keycode from the scancode->keycode table
  * @idev:	the struct input_dev device descriptor
@@ -643,7 +680,16 @@ static void ir_do_keydown(struct rc_dev *dev, enum rc_type protocol,
 	if (new_event && dev->keypressed)
 		ir_do_keyup(dev, false);
 
-	input_event(dev->input_dev, EV_MSC, MSC_SCAN, scancode);
+         /**
+          * IR driver is modfied to send the keycode to android  in
+          * EV_KEY event, android input subsystem broadcasts key
+          * events and key codes to applications.
+          */
+        if(0 == (ir_scantokeycode(dev->input_dev,scancode,&keycode))) {
+                input_event(dev->input_dev, EV_KEY,keycode,0);
+                printk(KERN_INFO "IR: simulate key state for Android\n");
+                input_event(dev->input_dev, EV_KEY,keycode,1);
+        }
 
 	if (new_event && keycode != KEY_RESERVED) {
 		/* Register a keypress */
@@ -1346,10 +1392,8 @@ int rc_register_device(struct rc_dev *dev)
 	if (!rc_map || !rc_map->scan || rc_map->size == 0)
 		return -EINVAL;
 
-	set_bit(EV_KEY, dev->input_dev->evbit);
-	set_bit(EV_REP, dev->input_dev->evbit);
-	set_bit(EV_MSC, dev->input_dev->evbit);
-	set_bit(MSC_SCAN, dev->input_dev->mscbit);
+        /*set key input driver*/
+        set_bit(EV_KEY, dev->input_dev->evbit);
 	if (dev->open)
 		dev->input_dev->open = ir_open;
 	if (dev->close)
