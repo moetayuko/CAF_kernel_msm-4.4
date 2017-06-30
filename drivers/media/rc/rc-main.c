@@ -644,6 +644,7 @@ static void ir_do_keydown(struct rc_dev *dev, enum rc_type protocol,
 		ir_do_keyup(dev, false);
 
 	input_event(dev->input_dev, EV_MSC, MSC_SCAN, scancode);
+	input_sync(dev->input_dev);
 
 	if (new_event && keycode != KEY_RESERVED) {
 		/* Register a keypress */
@@ -657,6 +658,7 @@ static void ir_do_keydown(struct rc_dev *dev, enum rc_type protocol,
 			   "key 0x%04x, protocol 0x%04x, scancode 0x%08x\n",
 			   dev->input_name, keycode, protocol, scancode);
 		input_report_key(dev->input_dev, keycode, 1);
+		input_sync(dev->input_dev);
 
 		led_trigger_event(led_feedback, LED_FULL);
 	}
@@ -1347,7 +1349,6 @@ int rc_register_device(struct rc_dev *dev)
 		return -EINVAL;
 
 	set_bit(EV_KEY, dev->input_dev->evbit);
-	set_bit(EV_REP, dev->input_dev->evbit);
 	set_bit(EV_MSC, dev->input_dev->evbit);
 	set_bit(MSC_SCAN, dev->input_dev->mscbit);
 	if (dev->open)
