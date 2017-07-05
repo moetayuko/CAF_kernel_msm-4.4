@@ -178,6 +178,52 @@ enum cci_i2c_master_t {
 	MASTER_MAX,
 };
 
+struct msm_sensor_status_event {
+	uint8_t rx0_status;
+	uint8_t rx1_status;
+	uint8_t rx2_status;
+	uint8_t rx3_status;
+};
+
+struct msm_sensor_event_data {
+	uint16_t sensor_slave_addr;
+	uint32_t sensor_device_id;
+	union {
+		/* Sent for sensor status event */
+		struct msm_sensor_status_event sensor_status;
+
+	} u;
+};
+
+enum msm_sensor_event_mask_index {
+	SENSOR_EVENT_MASK_INDEX_SIGNAL_LOST		= 0,
+	SENSOR_EVENT_MASK_INDEX_SIGNAL_VALID	= 1,
+	SENSOR_EVENT_MASK_INDEX_SIGNAL_STATUS	= 2,
+};
+
+#define SENSOR_EVENT_SUBS_MASK_NONE			0
+
+#define SENSOR_EVENT_SUBS_MASK_SIGNAL_LOST \
+			(1 << SENSOR_EVENT_MASK_INDEX_SIGNAL_LOST)
+
+#define SENSOR_EVENT_SUBS_MASK_SIGNAL_VALID \
+			(1 << SENSOR_EVENT_MASK_INDEX_SIGNAL_VALID)
+
+#define SENSOR_EVENT_SUBS_MASK_SIGNAL_STATUS \
+			(1 << SENSOR_EVENT_MASK_INDEX_SIGNAL_STATUS)
+
+enum msm_sensor_event_idx {
+	SENSOR_SIGNAL_LOST        = 0,
+	SENSOR_SIGNAL_VALID       = 1,
+	SENSOR_SIGNAL_STATUS      = 2,
+	SENSOR_EVENT_MAX          = 15
+};
+
+#define SENSOR_EVENT_BASE            (V4L2_EVENT_PRIVATE_START)
+#define SENSOR_EVENT_SIGNAL_LOST     (SENSOR_EVENT_BASE + SENSOR_SIGNAL_LOST)
+#define SENSOR_EVENT_SIGNAL_VALID    (SENSOR_EVENT_BASE + SENSOR_SIGNAL_VALID)
+#define SENSOR_EVENT_SIGNAL_STATUS   (SENSOR_EVENT_BASE + SENSOR_SIGNAL_STATUS)
+
 struct msm_camera_i2c_array_write_config {
 	struct msm_camera_i2c_reg_setting conf_array;
 	uint16_t slave_addr;
