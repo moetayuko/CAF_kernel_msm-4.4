@@ -109,6 +109,7 @@ enum hdmi_tx_feature_type {
  * @codec_ready:      If audio codec is ready.
  * @client_notify_pending: If there is client notification pending.
  * @irq_domain:       IRQ domain structure.
+ * @pll_update_enable: if it's allowed to update HDMI PLL ppm.
  * @notifier:         CEC notifider to convey physical address information.
  * @root:             Debug fs root entry.
  */
@@ -142,6 +143,9 @@ struct sde_hdmi {
 	u8 hdcp_status;
 	u32 enc_lvl;
 	bool auth_state;
+	bool sink_hdcp22_support;
+	bool src_hdcp22_support;
+
 	/*hold final data
 	 *based on hdcp support
 	 */
@@ -156,6 +160,7 @@ struct sde_hdmi {
 
 	struct irq_domain *irq_domain;
 	struct cec_notifier *notifier;
+	bool pll_update_enable;
 
 	struct delayed_work hdcp_cb_work;
 	struct dss_io_data io[HDMI_TX_MAX_IO];
@@ -342,6 +347,22 @@ int sde_hdmi_set_property(struct drm_connector *connector,
 			void *display);
 
 /**
+ * sde_hdmi_get_property() - get the connector properties
+ * @connector:        Handle to the connector.
+ * @state:            Handle to the connector state.
+ * @property_index:   property index.
+ * @value:            property value.
+ * @display:          Handle to the display.
+ *
+ * Return: error code.
+ */
+int sde_hdmi_get_property(struct drm_connector *connector,
+			struct drm_connector_state *state,
+			int property_index,
+			uint64_t *value,
+			void *display);
+
+/**
  * sde_hdmi_bridge_init() - init sde hdmi bridge
  * @hdmi:          Handle to the hdmi.
  *
@@ -430,6 +451,17 @@ bool sde_hdmi_tx_is_stream_shareable(struct sde_hdmi *hdmi_ctrl);
 bool sde_hdmi_tx_is_panel_on(struct sde_hdmi *hdmi_ctrl);
 int sde_hdmi_start_hdcp(struct drm_connector *connector);
 void sde_hdmi_hdcp_off(struct sde_hdmi *hdmi_ctrl);
+
+
+/*
+ * sde_hdmi_pre_kickoff - program kickoff-time features
+ * @display: Pointer to private display structure
+ * @params: Parameters for kickoff-time programming
+ * Returns: Zero on success
+ */
+int sde_hdmi_pre_kickoff(struct drm_connector *connector,
+		void *display,
+		struct msm_display_kickoff_params *params);
 
 #else /*#ifdef CONFIG_DRM_SDE_HDMI*/
 

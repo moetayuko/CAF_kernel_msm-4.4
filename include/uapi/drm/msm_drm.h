@@ -62,6 +62,41 @@ struct drm_msm_timespec {
 	__s64 tv_nsec;         /* nanoseconds */
 };
 
+/*
+ * HDR Metadata
+ * These are defined as per EDID spec and shall be used by the sink
+ * to set the HDR metadata for playback from userspace.
+ */
+
+#define HDR_PRIMARIES_COUNT   3
+
+struct drm_msm_ext_panel_hdr_metadata {
+	__u32 eotf;             /* electro optical transfer function */
+	__u32 hdr_supported;    /* HDR supported */
+	__u32 display_primaries_x[HDR_PRIMARIES_COUNT]; /* Primaries x */
+	__u32 display_primaries_y[HDR_PRIMARIES_COUNT]; /* Primaries y */
+	__u32 white_point_x;    /* white_point_x */
+	__u32 white_point_y;    /* white_point_y */
+	__u32 max_luminance;    /* Max luminance */
+	__u32 min_luminance;    /* Min Luminance */
+	__u32 max_content_light_level; /* max content light level */
+	__u32 max_average_light_level; /* max average light level */
+};
+
+/**
+ * HDR sink properties
+ * These are defined as per EDID spec and shall be used by the userspace
+ * to determine the HDR properties to be set to the sink.
+ */
+struct drm_msm_ext_panel_hdr_properties {
+	__u8 hdr_metadata_type_one;   /* static metadata type one */
+	__u32 hdr_supported;          /* HDR supported */
+	__u32 hdr_eotf;               /* electro optical transfer function */
+	__u32 hdr_max_luminance;      /* Max luminance */
+	__u32 hdr_avg_luminance;      /* Avg luminance */
+	__u32 hdr_min_luminance;      /* Min Luminance */
+};
+
 #define MSM_PARAM_GPU_ID     0x01
 #define MSM_PARAM_GMEM_SIZE  0x02
 #define MSM_PARAM_CHIP_ID    0x03
@@ -362,12 +397,27 @@ struct drm_msm_gem_sync {
  * use and query 0 but cannot destroy it.
  */
 
-#define MSM_SUBMITQUEUE_FLAGS (0)
+/*
+ * Allows a process to bypass the 2 second quality of service timeout.
+ * Only CAP_SYS_ADMIN capable processes can set this flag.
+ */
+#define MSM_SUBMITQUEUE_BYPASS_QOS_TIMEOUT 0x00000001
+
+#define MSM_SUBMITQUEUE_FLAGS (MSM_SUBMITQUEUE_BYPASS_QOS_TIMEOUT)
 
 struct drm_msm_submitqueue {
 	__u32 flags;   /* in, MSM_SUBMITQUEUE_x */
 	__u32 prio;    /* in, Priority level */
 	__u32 id;      /* out, identifier */
+};
+
+#define MSM_SUBMITQUEUE_PARAM_FAULTS 0
+
+struct drm_msm_submitqueue_query {
+	__u64 data;
+	__u32 id;
+	__u32 param;
+	__u32 len;
 };
 
 #define DRM_MSM_GET_PARAM              0x00
@@ -384,6 +434,7 @@ struct drm_msm_submitqueue {
 #define DRM_MSM_GEM_SVM_NEW            0x09
 #define DRM_MSM_SUBMITQUEUE_NEW        0x0A
 #define DRM_MSM_SUBMITQUEUE_CLOSE      0x0B
+#define DRM_MSM_SUBMITQUEUE_QUERY      0x0C
 
 #define DRM_SDE_WB_CONFIG              0x40
 #define DRM_MSM_REGISTER_EVENT         0x41
@@ -432,6 +483,9 @@ struct drm_msm_submitqueue {
 #define DRM_IOCTL_MSM_SUBMITQUEUE_CLOSE \
 	DRM_IOW(DRM_COMMAND_BASE + DRM_MSM_SUBMITQUEUE_CLOSE, \
 		struct drm_msm_submitqueue)
+#define DRM_IOCTL_MSM_SUBMITQUEUE_QUERY \
+	DRM_IOWR(DRM_COMMAND_BASE + DRM_MSM_SUBMITQUEUE_QUERY, \
+		struct drm_msm_submitqueue_query)
 
 #if defined(__cplusplus)
 }

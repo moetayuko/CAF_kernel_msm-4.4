@@ -1693,33 +1693,7 @@ static int __perf_remove_from_context(void *info)
 	return 0;
 }
 
-
-#ifdef CONFIG_SMP
-static void perf_retry_remove(struct perf_event *event,
-			      struct remove_event *rep)
-{
-	int up_ret;
-	/*
-	 * CPU was offline. Bring it online so we can
-	 * gracefully exit a perf context.
-	 */
-	up_ret = cpu_up(event->cpu);
-	if (!up_ret)
-		/* Try the remove call once again. */
-		cpu_function_call(event->cpu, __perf_remove_from_context,
-				  rep);
-	else
-		pr_err("Failed to bring up CPU: %d, ret: %d\n",
-		       event->cpu, up_ret);
-}
-#else
-static void perf_retry_remove(struct perf_event *event,
-			      struct remove_event *rep)
-{
-}
-#endif
-
- /*
+/*
  * Remove the event from a task's (or a CPU's) list of events.
  *
  * CPU events are removed with a smp call. For task events we only
@@ -1754,9 +1728,6 @@ static void __ref perf_remove_from_context(struct perf_event *event,
 		 */
 		ret = cpu_function_call(event->cpu, __perf_remove_from_context,
 					&re);
-		if (ret == -ENXIO)
-			perf_retry_remove(event, &re);
-
 		return;
 	}
 
@@ -6595,6 +6566,21 @@ static void perf_log_itrace_start(struct perf_event *event)
 	perf_output_end(&handle);
 }
 
+static bool sample_is_allowed(struct perf_event *event, struct pt_regs *regs)
+{
+	/*
+	 * Due to interrupt latency (AKA "skid"), we may enter the
+	 * kernel before taking an overflow, even if the PMU is only
+	 * counting user events.
+	 * To avoid leaking information to userspace, we must always
+	 * reject kernel samples when exclude_kernel is set.
+	 */
+	if (event->attr.exclude_kernel && !user_mode(regs))
+		return false;
+
+	return true;
+}
+
 /*
  * Generic event overflow handling, sampling.
  */
@@ -6640,6 +6626,12 @@ static int __perf_event_overflow(struct perf_event *event,
 		if (delta > 0 && delta < 2*TICK_NSEC)
 			perf_adjust_period(event, delta, hwc->last_period, true);
 	}
+
+	/*
+	 * For security, drop the skid kernel samples if necessary.
+	 */
+	if (!sample_is_allowed(event, regs))
+		return ret;
 
 	/*
 	 * XXX event_limit might not quite work as expected on inherited
@@ -7117,8 +7109,6 @@ static struct pmu perf_swevent = {
 	.start		= perf_swevent_start,
 	.stop		= perf_swevent_stop,
 	.read		= perf_swevent_read,
-
-	.events_across_hotplug = 1,
 };
 
 #ifdef CONFIG_EVENT_TRACING
@@ -7240,8 +7230,6 @@ static struct pmu perf_tracepoint = {
 	.start		= perf_swevent_start,
 	.stop		= perf_swevent_stop,
 	.read		= perf_swevent_read,
-
-	.events_across_hotplug = 1,
 };
 
 static inline void perf_tp_register(void)
@@ -7529,8 +7517,6 @@ static struct pmu perf_cpu_clock = {
 	.start		= cpu_clock_event_start,
 	.stop		= cpu_clock_event_stop,
 	.read		= cpu_clock_event_read,
-
-	.events_across_hotplug = 1,
 };
 
 /*
@@ -7612,8 +7598,6 @@ static struct pmu perf_task_clock = {
 	.start		= task_clock_event_start,
 	.stop		= task_clock_event_stop,
 	.read		= task_clock_event_read,
-
-	.events_across_hotplug = 1,
 };
 
 static void perf_pmu_nop_void(struct pmu *pmu)
