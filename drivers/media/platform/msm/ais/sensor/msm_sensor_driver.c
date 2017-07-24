@@ -955,7 +955,7 @@ CSID_TG:
 	}
 
 	/* Power down */
-	s_ctrl->func_tbl->sensor_power_down(s_ctrl);
+	/*s_ctrl->func_tbl->sensor_power_down(s_ctrl);*/
 
 	rc = msm_sensor_fill_slave_info_init_params(
 		slave_info,
