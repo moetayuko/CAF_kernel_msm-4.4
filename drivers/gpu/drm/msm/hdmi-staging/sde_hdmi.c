@@ -556,13 +556,13 @@ static const struct file_operations sde_hdmi_hdcp_state_fops = {
 	.read = _sde_hdmi_hdcp_state_read,
 };
 
-static u64 _sde_hdmi_clip_valid_pclk(struct drm_display_mode *mode, u64 pclk_in)
+static u64 _sde_hdmi_clip_valid_pclk(struct hdmi *hdmi, u64 pclk_in)
 {
 	u32 pclk_delta, pclk;
 	u64 pclk_clip = pclk_in;
 
 	/* as per standard, 0.5% of deviation is allowed */
-	pclk = mode->clock * HDMI_KHZ_TO_HZ;
+	pclk = hdmi->pixclock;
 	pclk_delta = pclk * 5 / 1000;
 
 	if (pclk_in < (pclk - pclk_delta))
@@ -700,7 +700,6 @@ static void sde_hdmi_tx_hdcp_cb_work(struct work_struct *work)
 static int _sde_hdmi_update_pll_delta(struct sde_hdmi *display, s32 ppm)
 {
 	struct hdmi *hdmi = display->ctrl.ctrl;
-	struct drm_display_mode *current_mode = &display->mode;
 	u64 cur_pclk, dst_pclk;
 	u64 clip_pclk;
 	int rc = 0;
@@ -725,7 +724,7 @@ static int _sde_hdmi_update_pll_delta(struct sde_hdmi *display, s32 ppm)
 	dst_pclk = cur_pclk * (1000000000 + ppm);
 	do_div(dst_pclk, 1000000000);
 
-	clip_pclk = _sde_hdmi_clip_valid_pclk(current_mode, dst_pclk);
+	clip_pclk = _sde_hdmi_clip_valid_pclk(hdmi, dst_pclk);
 
 	/* update pclk */
 	if (clip_pclk != cur_pclk) {
@@ -1254,6 +1253,13 @@ static int _sde_hdmi_hpd_enable(struct sde_hdmi *sde_hdmi)
 	uint32_t hpd_ctrl;
 	int i, ret;
 	unsigned long flags;
+	struct drm_connector *connector;
+	struct msm_drm_private *priv;
+	struct sde_kms *sde_kms;
+
+	connector = hdmi->connector;
+	priv = connector->dev->dev_private;
+	sde_kms = to_sde_kms(priv->kms);
 
 	for (i = 0; i < config->hpd_reg_cnt; i++) {
 		ret = regulator_enable(hdmi->hpd_regs[i]);
@@ -1293,9 +1299,11 @@ static int _sde_hdmi_hpd_enable(struct sde_hdmi *sde_hdmi)
 		}
 	}
 
-	sde_hdmi_set_mode(hdmi, false);
-	_sde_hdmi_phy_reset(hdmi);
-	sde_hdmi_set_mode(hdmi, true);
+	if (!sde_kms->splash_info.handoff) {
+		sde_hdmi_set_mode(hdmi, false);
+		_sde_hdmi_phy_reset(hdmi);
+		sde_hdmi_set_mode(hdmi, true);
+	}
 
 	hdmi_write(hdmi, REG_HDMI_USEC_REFTIMER, 0x0001001b);
 
@@ -1962,6 +1970,30 @@ enable_packet_control:
 	hdmi_write(hdmi, HDMI_GEN_PKT_CTRL, packet_control);
 }
 
+static void sde_hdmi_clear_hdr_infoframe(struct sde_hdmi *display)
+{
+	struct hdmi *hdmi;
+	struct drm_connector *connector;
+	u32 packet_control = 0;
+
+	if (!display) {
+		SDE_ERROR("invalid input\n");
+		return;
+	}
+
+	hdmi = display->ctrl.ctrl;
+	connector = display->ctrl.ctrl->connector;
+
+	if (!hdmi || !connector) {
+		SDE_ERROR("invalid input\n");
+		return;
+	}
+
+	packet_control = hdmi_read(hdmi, HDMI_GEN_PKT_CTRL);
+	packet_control &= ~HDMI_GEN_PKT_CTRL_CLR_MASK;
+	hdmi_write(hdmi, HDMI_GEN_PKT_CTRL, packet_control);
+}
+
 int sde_hdmi_set_property(struct drm_connector *connector,
 			struct drm_connector_state *state,
 			int property_index,
@@ -2126,9 +2158,13 @@ static int sde_hdmi_tx_check_capability(struct sde_hdmi *sde_hdmi)
 		}
 	}
 
-	SDE_DEBUG("%s: Features <HDMI:%s, HDCP:%s>\n", __func__,
+	if (sde_hdmi->hdmi_tx_major_version >= HDMI_TX_VERSION_4)
+		sde_hdmi->dc_feature_supported = true;
+
+	SDE_DEBUG("%s: Features <HDMI:%s, HDCP:%s, Deep Color:%s>\n", __func__,
 			hdmi_disabled ? "OFF" : "ON",
-			hdcp_disabled ? "OFF" : "ON");
+			hdcp_disabled ? "OFF" : "ON",
+			sde_hdmi->dc_feature_supported ? "ON" : "OFF");
 
 	if (hdmi_disabled) {
 		DEV_ERR("%s: HDMI disabled\n", __func__);
@@ -2302,15 +2338,28 @@ int sde_hdmi_pre_kickoff(struct drm_connector *connector,
 	void *display,
 	struct msm_display_kickoff_params *params)
 {
+	struct sde_hdmi *hdmi_display = (struct sde_hdmi *)display;
+	struct drm_msm_ext_panel_hdr_ctrl *hdr_ctrl;
+	u8 hdr_op;
 
 	if (!connector || !display || !params) {
 		pr_err("Invalid params\n");
 		return -EINVAL;
 	}
 
-	if (connector->hdr_supported)
-		sde_hdmi_panel_set_hdr_infoframe(display,
-			params->hdr_metadata);
+	hdr_ctrl = params->hdr_ctrl;
+
+	hdr_op = sde_hdmi_hdr_get_ops(hdmi_display->curr_hdr_state,
+		hdr_ctrl->hdr_state);
+
+	if (hdr_op == HDR_SEND_INFO) {
+		if (connector->hdr_supported)
+			sde_hdmi_panel_set_hdr_infoframe(display,
+				&hdr_ctrl->hdr_meta);
+	} else if (hdr_op == HDR_CLEAR_INFO)
+		sde_hdmi_clear_hdr_infoframe(display);
+
+	hdmi_display->curr_hdr_state = hdr_ctrl->hdr_state;
 
 	return 0;
 }
@@ -2823,6 +2872,7 @@ int sde_hdmi_drm_init(struct sde_hdmi *display, struct drm_encoder *enc)
 	struct msm_drm_private *priv = NULL;
 	struct hdmi *hdmi;
 	struct platform_device *pdev;
+	struct sde_kms *sde_kms;
 
 	DBG("");
 	if (!display || !display->drm_dev || !enc) {
@@ -2880,6 +2930,19 @@ int sde_hdmi_drm_init(struct sde_hdmi *display, struct drm_encoder *enc)
 
 	enc->bridge = hdmi->bridge;
 	priv->bridges[priv->num_bridges++] = hdmi->bridge;
+
+	/*
+	 * After initialising HDMI bridge, we need to check
+	 * whether the early display is enabled for HDMI.
+	 * If yes, we need to increase refcount of hdmi power
+	 * clocks. This can skip the clock disabling operation in
+	 * clock_late_init when finding clk.count == 1.
+	 */
+	sde_kms = to_sde_kms(priv->kms);
+	if (sde_kms->splash_info.handoff) {
+		sde_hdmi_bridge_power_on(hdmi->bridge);
+		hdmi->power_on = true;
+	}
 
 	mutex_unlock(&display->display_lock);
 	return 0;
