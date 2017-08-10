@@ -1573,7 +1573,7 @@ static void hdmi_tx_hdcp_cb_work(struct work_struct *work)
 		break;
 	case HDCP_STATE_AUTH_FAIL:
 		if (hdmi_ctrl->hdcp1_use_sw_keys && hdmi_ctrl->hdcp14_present) {
-			if (hdmi_ctrl->auth_state)
+			if (hdmi_ctrl->auth_state && !hdmi_ctrl->hdcp22_present)
 				hdcp1_set_enc(false);
 		}
 
@@ -2417,17 +2417,8 @@ static int hdmi_tx_check_capability(struct hdmi_tx_ctrl *hdmi_ctrl)
 		hdmi_disabled = reg_val & BIT(13);
 
 		reg_val = DSS_REG_R_ND(io, SEC_CTRL_HW_VERSION);
-		/*
-		 * With HDCP enabled on capable hardware, check if HW
-		 * or SW keys should be used.
-		 */
-		if (!hdcp_disabled && (reg_val >= HDCP_SEL_MIN_SEC_VERSION)) {
-			reg_val = DSS_REG_R_ND(io,
-				QFPROM_RAW_FEAT_CONFIG_ROW0_MSB +
-				QFPROM_RAW_VERSION_4);
-			if (!(reg_val & BIT(23)))
-				hdmi_ctrl->hdcp1_use_sw_keys = true;
-		}
+
+		hdmi_ctrl->hdcp1_use_sw_keys = true;
 	}
 
 	if (hdmi_ctrl->hdmi_tx_version >= HDMI_TX_VERSION_403)
