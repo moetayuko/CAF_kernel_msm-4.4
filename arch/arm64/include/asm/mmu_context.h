@@ -37,6 +37,13 @@
 #include <asm/sysreg.h>
 #include <asm/tlbflush.h>
 
+#define cpu_switch_mm(pgd,mm)				\
+do {							\
+	BUG_ON(pgd == swapper_pg_dir);			\
+	cpu_set_reserved_ttbr0();			\
+	cpu_do_switch_mm(virt_to_phys(pgd),mm);		\
+} while (0)
+
 static inline void contextidr_thread_switch(struct task_struct *next)
 {
 	if (!IS_ENABLED(CONFIG_PID_IN_CONTEXTIDR))
