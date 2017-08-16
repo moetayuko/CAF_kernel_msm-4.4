@@ -135,3 +135,8 @@
 &ipa_hw {
         status = "disabled";
 };
+
+&pcie0 {
+        qcom,boot-option = <0x0>;
+};
+
