@@ -124,7 +124,7 @@
 		gpios = <&tlmm 120 1>;
 		pinctrl-names = "default";
 		pinctrl-0 = <&ir_int>;
-		linux,rc-map-name = "rc-rc6-p2fp";
+		linux,rc-map-name = "rc-tvx-hd-nec";
 	};
 
         qcom,rmnet-ipa {

@@ -101,14 +101,14 @@ static int ir_rc6_decode(struct rc_dev *dev, struct ir_raw_event ev)
 		return 0;
 	}
 
-	if (!geq_margin(ev.duration, RC6_UNIT, RC6_UNIT / 2))
+	if (!geq_margin(ev.duration, RC6_UNIT, RC6_UNIT * 2 / 2))
 		goto out;
 
 again:
 	IR_dprintk(2, "RC6 decode started at state %i (%uus %s)\n",
 		   data->state, TO_US(ev.duration), TO_STR(ev.pulse));
 
-	if (!geq_margin(ev.duration, RC6_UNIT, RC6_UNIT / 2))
+	if (!geq_margin(ev.duration, RC6_UNIT, RC6_UNIT * 2 / 2))
 		return 0;
 
 	switch (data->state) {
@@ -120,7 +120,7 @@ again:
 		/* Note: larger margin on first pulse since each RC6_UNIT
 		   is quite short and some hardware takes some time to
 		   adjust to the signal */
-		if (!eq_margin(ev.duration, RC6_PREFIX_PULSE, RC6_UNIT))
+		if (!eq_margin(ev.duration, RC6_PREFIX_PULSE, RC6_UNIT * 2))
 			break;
 
 		data->state = STATE_PREFIX_SPACE;
@@ -131,7 +131,7 @@ again:
 		if (ev.pulse)
 			break;
 
-		if (!eq_margin(ev.duration, RC6_PREFIX_SPACE, RC6_UNIT / 2))
+		if (!eq_margin(ev.duration, RC6_PREFIX_SPACE, RC6_UNIT * 2 / 2))
 			break;
 
 		data->state = STATE_HEADER_BIT_START;
@@ -139,7 +139,7 @@ again:
 		return 0;
 
 	case STATE_HEADER_BIT_START:
-		if (!eq_margin(ev.duration, RC6_BIT_START, RC6_UNIT / 2))
+		if (!eq_margin(ev.duration, RC6_BIT_START, RC6_UNIT * 2 / 2))
 			break;
 
 		data->header <<= 1;
@@ -162,7 +162,7 @@ again:
 		goto again;
 
 	case STATE_TOGGLE_START:
-		if (!eq_margin(ev.duration, RC6_TOGGLE_START, RC6_UNIT / 2))
+		if (!eq_margin(ev.duration, RC6_TOGGLE_START, RC6_UNIT * 2 / 2))
 			break;
 
 		data->toggle = ev.pulse;
@@ -171,7 +171,7 @@ again:
 
 	case STATE_TOGGLE_END:
 		if (!is_transition(&ev, &dev->raw->prev_ev) ||
-		    !geq_margin(ev.duration, RC6_TOGGLE_END, RC6_UNIT / 2))
+		    !geq_margin(ev.duration, RC6_TOGGLE_END, RC6_UNIT * 2 / 2))
 			break;
 
 		if (!(data->header & RC6_STARTBIT_MASK)) {
@@ -198,7 +198,7 @@ again:
 		goto again;
 
 	case STATE_BODY_BIT_START:
-		if (eq_margin(ev.duration, RC6_BIT_START, RC6_UNIT / 2)) {
+		if (eq_margin(ev.duration, RC6_BIT_START, RC6_UNIT * 2 / 2)) {
 			/* Discard LSB's that won't fit in data->body */
 			if (data->count++ < CHAR_BIT * sizeof data->body) {
 				data->body <<= 1;
@@ -208,7 +208,7 @@ again:
 			data->state = STATE_BODY_BIT_END;
 			return 0;
 		} else if (RC6_MODE_6A == rc6_mode(data) && !ev.pulse &&
-				geq_margin(ev.duration, RC6_SUFFIX_SPACE, RC6_UNIT / 2)) {
+				geq_margin(ev.duration, RC6_SUFFIX_SPACE, RC6_UNIT * 2 / 2)) {
 			data->state = STATE_FINISHED;
 			goto again;
 		}
