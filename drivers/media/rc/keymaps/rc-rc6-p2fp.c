@@ -36,6 +36,23 @@ static struct rc_map_table rc_rc6_p2fp[] = {
 	{ 91, KEY_RIGHT},
 	{ 89, KEY_DOWN},
 	{ 10, KEY_BACK},
+        { 37, KEY_RECORD},
+        { 204, KEY_PROGRAM},
+        { 44, KEY_PLAY},
+        { 30, KEY_PAUSE},
+        { 43, KEY_REWIND},
+        { 28, KEY_FORWARD},
+        { 31, KEY_STOP},
+        { 15, KEY_INFO},
+        { 54, KEY_HOME},
+        { 109, KEY_RED},
+        { 110, KEY_GREEN},
+        { 70, KEY_BLUE},
+        { 40, KEY_OPTION},
+        { 210, KEY_LIST},
+        { 75, KEY_SUBTITLE},
+        { 159, KEY_TV},
+        { 38, KEY_SWITCHVIDEOMODE},
 };
 
 static struct rc_map_list rc_rc6_p2fp_map = {
