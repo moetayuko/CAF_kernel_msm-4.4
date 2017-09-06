@@ -49,7 +49,7 @@ static struct rc_map_table rc_rc6_p2fp[] = {
         { 110, KEY_GREEN},
         { 111, KEY_YELLOW},
         { 112, KEY_BLUE},
-        { 64, KEY_OPTION},
+        { 64, KEY_MENU},
         { 210, KEY_LIST},
         { 75, KEY_SUBTITLE},
         { 159, KEY_TV},
