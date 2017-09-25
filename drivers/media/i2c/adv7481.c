@@ -1029,6 +1029,7 @@ static long adv7481_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 	struct adv7481_state *state = to_state(sd);
 	int *ret_val = arg;
 	struct msm_ba_v4l2_ioctl_t adv_arg = *(struct msm_ba_v4l2_ioctl_t *)arg;
+	uint8_t status = 0;
 	long ret = 0;
 	int param = 0;
 	struct csi_ctrl_params user_csi;
@@ -1091,6 +1092,22 @@ static long adv7481_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 		}
 		break;
 	}
+	case VIDIOC_CVBS_G_FIELD_STATUS:
+		/* Select SDP read-only Map 1 */
+		adv7481_wr_byte(&state->i2c_client, state->i2c_sdp_addr,
+				SDP_RW_MAP_REG, 0x02);
+		status = adv7481_rd_byte(&state->i2c_client,
+				state->i2c_sdp_addr, SDP_RO_MAP_1_FIELD_ADDR);
+		adv7481_wr_byte(&state->i2c_client, state->i2c_sdp_addr,
+				SDP_RW_MAP_REG, 0x00);
+		if (ret_val) {
+			*ret_val = ADV_REG_GETFIELD(status,
+				SDP_RO_MAP_1_EVEN_FIELD);
+		} else {
+			pr_err("%s: NULL pointer provided\n", __func__);
+			ret = -EINVAL;
+		}
+		break;
 	default:
 		pr_err("Not a typewriter! Command: 0x%x", cmd);
 		ret = -ENOTTY;
