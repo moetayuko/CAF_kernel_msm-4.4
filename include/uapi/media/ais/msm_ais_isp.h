@@ -732,6 +732,7 @@ struct msm_isp_buf_event {
 	uint32_t stream_id;
 	uint32_t handle;
 	uint32_t output_format;
+	uint32_t field_type;
 	int8_t buf_idx;
 };
 struct msm_isp_fetch_eng_event {
@@ -924,6 +925,8 @@ struct msm_vfe_axi_output_path_cfg {
 	uint8_t rdi_cid;
 	uint8_t rdi_frameskip_en;
 	uint32_t rdi_frameskip_pattern;
+
+	bool interlaced;
 };
 
 struct msm_vfe_axi_output_cfg {
