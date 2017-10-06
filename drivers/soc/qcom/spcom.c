@@ -493,13 +493,10 @@ static void spcom_notify_state(void *handle, const void *priv, unsigned event)
 
 		ch->glink_state = event;
 
-		/*
-		 * if spcom_notify_state() is called within glink_open()
-		 * then ch->glink_handle is not updated yet.
-		 */
-		if (!ch->glink_handle) {
-			pr_debug("update glink_handle, ch [%s].\n", ch->name);
-			ch->glink_handle = handle;
+		if (!handle) {
+			pr_err("inavlid glink_handle, ch [%s].\n", ch->name);
+			mutex_unlock(&ch->lock);
+			return;
 		}
 
 		/* signal before unlock mutex & before calling glink */
@@ -512,8 +509,7 @@ static void spcom_notify_state(void *handle, const void *priv, unsigned event)
 		 */
 
 		pr_debug("call glink_queue_rx_intent() ch [%s].\n", ch->name);
-		ret = glink_queue_rx_intent(ch->glink_handle,
-					    ch, ch->rx_buf_size);
+		ret = glink_queue_rx_intent(handle, ch, ch->rx_buf_size);
 		if (ret) {
 			pr_err("glink_queue_rx_intent() err [%d]\n", ret);
 		} else {
@@ -1028,10 +1024,12 @@ static int spcom_get_next_request_size(struct spcom_channel *ch)
 			 ch->name, ch->actual_rx_size);
 		goto exit_ready;
 	}
+	mutex_unlock(&ch->lock); /* unlock while waiting */
 
 	pr_debug("Wait for Rx Done, ch [%s].\n", ch->name);
 	wait_for_completion(&ch->rx_done);
 
+	mutex_lock(&ch->lock); /* re-lock after waiting */
 	/* Check Rx Abort on SP reset */
 	if (ch->rx_abort) {
 		pr_err("rx aborted.\n");

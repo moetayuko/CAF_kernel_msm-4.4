@@ -185,9 +185,14 @@ static void vblank_ctrl_worker(struct kthread_work *work)
 	struct msm_kms *kms = priv->kms;
 	struct vblank_event *vbl_ev, *tmp;
 	unsigned long flags;
+	struct kthread_worker *worker = work->worker;
+	struct msm_drm_commit *commit = container_of(worker,
+						struct msm_drm_commit, worker);
 
 	spin_lock_irqsave(&vbl_ctrl->lock, flags);
 	list_for_each_entry_safe(vbl_ev, tmp, &vbl_ctrl->event_list, node) {
+		if (vbl_ev->crtc_id != commit->crtc_id)
+			continue;
 		list_del(&vbl_ev->node);
 		spin_unlock_irqrestore(&vbl_ctrl->lock, flags);
 
@@ -673,10 +678,10 @@ static int msm_open(struct drm_device *dev, struct drm_file *file)
 	if (IS_ERR(ctx))
 		return PTR_ERR(ctx);
 
-	if (ctx)
+	if (ctx) {
 		INIT_LIST_HEAD(&ctx->counters);
-
-	msm_submitqueue_init(ctx);
+		msm_submitqueue_init(ctx);
+	}
 
 	file->driver_priv = ctx;
 
@@ -2146,7 +2151,9 @@ static int msm_pdev_probe(struct platform_device *pdev)
 
 #ifdef CONFIG_OF
 	add_components(&pdev->dev, &match, "connectors");
+#ifndef CONFIG_QCOM_KGSL
 	add_components(&pdev->dev, &match, "gpus");
+#endif
 #else
 	/* For non-DT case, it kinda sucks.  We don't actually have a way
 	 * to know whether or not we are waiting for certain devices (or if
