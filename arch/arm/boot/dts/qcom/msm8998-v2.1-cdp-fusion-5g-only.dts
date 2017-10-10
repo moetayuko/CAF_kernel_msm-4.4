@@ -103,3 +103,20 @@
 	status = "disabled";
 };
 
+&mhi_0 {
+	esoc-names = "mdm";
+	esoc-0 = <&mdm3>;
+	status = "okay";
+};
+
+&mhi_uci_0 {
+	status = "okay";
+};
+
+&mhi_netdev_0 {
+	status = "okay";
+};
+
+&mhi_netdev_1 {
+	status = "okay";
+};
