@@ -40,7 +40,6 @@ struct msm_ext_disp {
 	struct mutex lock;
 	struct completion hpd_comp;
 	bool update_audio;
-	enum msm_ext_disp_cable_state current_state;
 	u32 flags;
 };
 
@@ -343,7 +342,6 @@ static int msm_ext_disp_hpd(struct platform_device *pdev,
 		goto end;
 	}
 
-	ext_disp->current_state = state;
 	ext_disp->flags = flags;
 
 	if (state == EXT_DISPLAY_CABLE_CONNECT) {
@@ -695,13 +693,11 @@ int msm_ext_disp_register_audio_codec(struct platform_device *pdev,
 
 	mutex_lock(&ext_disp->lock);
 	if (ext_disp->update_audio) {
-		msm_ext_disp_update_audio_ops(ext_disp,
-				ext_disp->current_disp, ext_disp->current_state,
-				ext_disp->flags);
+		msm_ext_disp_update_audio_ops(ext_disp, ext_disp->current_disp,
+				EXT_DISPLAY_CABLE_CONNECT, ext_disp->flags);
 
-		msm_ext_disp_process_audio(ext_disp,
-				ext_disp->current_disp, ext_disp->current_state,
-				ext_disp->flags);
+		msm_ext_disp_process_audio(ext_disp, ext_disp->current_disp,
+				EXT_DISPLAY_CABLE_CONNECT, ext_disp->flags);
 
 		ext_disp->update_audio = false;
 	}
@@ -828,7 +824,6 @@ static int msm_ext_disp_probe(struct platform_device *pdev)
 	INIT_LIST_HEAD(&ext_disp->display_list);
 	init_completion(&ext_disp->hpd_comp);
 	ext_disp->current_disp = EXT_DISPLAY_TYPE_MAX;
-	ext_disp->current_state = EXT_DISPLAY_CABLE_DISCONNECT;
 	ext_disp->flags = 0;
 	ext_disp->update_audio = false;
 
