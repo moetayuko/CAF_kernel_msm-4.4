@@ -75,25 +75,14 @@ int adreno_hw_init(struct msm_gpu *gpu)
 	DBG("%s", gpu->name);
 
 	for (i = 0; i < gpu->nr_rings; i++) {
-		struct msm_ringbuffer *ring = gpu->rb[i];
-
-		int ret = msm_gem_get_iova(ring->bo, gpu->aspace,
-			&ring->iova);
+		int ret = msm_gem_get_iova(gpu->rb[i]->bo, gpu->aspace,
+			&gpu->rb[i]->iova);
 		if (ret) {
-			ring->iova = 0;
+			gpu->rb[i]->iova = 0;
 			dev_err(gpu->dev->dev,
 				"could not map ringbuffer %d: %d\n", i, ret);
 			return ret;
 		}
-
-		/* reset ringbuffer(s): */
-		/* No need for a lock here, nobody else is peeking in */
-		ring->cur = ring->start;
-		ring->next = ring->start;
-
-		/* reset completed fence seqno, discard anything pending: */
-		ring->memptrs->fence = adreno_submitted_fence(gpu, ring);
-		ring->memptrs->rptr  = 0;
 	}
 
 	/*
@@ -151,7 +140,8 @@ uint32_t adreno_submitted_fence(struct msm_gpu *gpu,
 void adreno_recover(struct msm_gpu *gpu)
 {
 	struct drm_device *dev = gpu->dev;
-	int ret;
+	struct msm_ringbuffer *ring;
+	int ret, i;
 
 	/*
 	 * XXX pm-runtime??  we *need* the device to be off after this
@@ -159,6 +149,21 @@ void adreno_recover(struct msm_gpu *gpu)
 	 */
 
 	gpu->funcs->pm_suspend(gpu);
+
+	/* reset ringbuffer(s): */
+
+	FOR_EACH_RING(gpu, ring, i) {
+		if (!ring)
+			continue;
+
+		/* No need for a lock here, nobody else is peeking in */
+		ring->cur = ring->start;
+		ring->next = ring->start;
+
+		/* reset completed fence seqno, discard anything pending: */
+		ring->memptrs->fence = adreno_submitted_fence(gpu, ring);
+		ring->memptrs->rptr  = 0;
+	}
 
 	gpu->funcs->pm_resume(gpu);
 
