@@ -245,7 +245,6 @@ int pil_do_ramdump(struct pil_desc *desc,
 
 	}
 	pr_debug("Continuing with full SSR dump for %s\n", desc->name);
->>>>>>> 7308c64ae3c3795e6e9165c26382adae20a9b332
 	list_for_each_entry(seg, &priv->segs, list)
 		count++;
 
