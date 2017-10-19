@@ -3,6 +3,26 @@
 
 #include <linux/types.h>
 
+int32_t habmm_socket_open(int32_t *handle, uint32_t mm_ip_id,
+              uint32_t timeout, uint32_t flags);
+int32_t habmm_socket_close(int32_t handle);
+int32_t habmm_socket_send(int32_t handle, void *src_buff, uint32_t size_bytes,
+              uint32_t flags);
+int32_t habmm_socket_recv(int32_t handle, void *dst_buff, uint32_t *size_bytes,
+              uint32_t timeout, uint32_t flags);
+int32_t habmm_socket_sendto(int32_t handle, void *src_buff, uint32_t size_bytes,
+                int32_t remote_handle, uint32_t flags);
+int32_t habmm_socket_recvfrom(int32_t handle, void *dst_buff,
+                  uint32_t *size_bytes, uint32_t timeout,
+                  int32_t *remote_handle, uint32_t flags);
+int32_t habmm_export(int32_t handle, void *buff_to_share, uint32_t size_bytes,
+             uint32_t *export_id, uint32_t flags);
+int32_t habmm_unexport(int32_t handle, uint32_t export_id, uint32_t flags);
+int32_t habmm_import(int32_t handle, void **buff_shared, uint32_t size_bytes,
+             uint32_t export_id, uint32_t flags);
+int32_t habmm_unimport(int32_t handle, uint32_t export_id, void *buff_shared,
+               uint32_t flags);
+
 struct hab_send {
 	__u64 data;
 	__s32 vcid;
@@ -73,8 +93,9 @@ struct hab_unimport {
 #define MM_AUD_END	105
 
 #define MM_CAM_START	200
-#define MM_CAM		201
-#define MM_CAM_END	202
+#define MM_CAM_1	201
+#define MM_CAM_2	202
+#define MM_CAM_END	203
 
 #define MM_DISP_START	300
 #define MM_DISP_1	301
@@ -102,13 +123,26 @@ struct hab_unimport {
 #define MM_QCPE_VM3	703
 #define MM_QCPE_VM4	704
 #define MM_QCPE_END	705
-#define MM_ID_MAX	706
+
+#define MM_CLK_START	800
+#define MM_CLK_VM1	801
+#define MM_CLK_VM2	802
+#define MM_CLK_END	803
+
+#define MM_ID_MAX	804
 
 #define HABMM_SOCKET_OPEN_FLAGS_SINGLE_BE_SINGLE_FE        0x00000000
 #define HABMM_SOCKET_OPEN_FLAGS_SINGLE_BE_SINGLE_DOMU      0x00000001
 #define HABMM_SOCKET_OPEN_FLAGS_SINGLE_BE_MULTI_DOMUS      0x00000002
 
 #define HABMM_SOCKET_SEND_FLAGS_NON_BLOCKING 0x00000001
+
+/* Collect cross-VM stats: client provides stat-buffer large enough to allow 2
+   sets of a 2-uint64_t pair to collect seconds and nano-seconds at the
+   beginning of the stat-buffer. Stats are collected when the stat-buffer leaves
+   VM1, then enters VM2
+ */
+#define HABMM_SOCKET_SEND_FLAGS_XING_VM_STAT 0x00000002
 
 #define HABMM_SOCKET_RECV_FLAGS_NON_BLOCKING 0x00000001
 

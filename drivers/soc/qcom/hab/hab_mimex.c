@@ -31,11 +31,11 @@ static int hab_export_ack_find(struct uhab_context *ctx,
 	struct hab_export_ack *expect_ack)
 {
 	int ret = 0;
-	struct hab_export_ack_recvd *ack_recvd;
+	struct hab_export_ack_recvd *ack_recvd, *tmp;
 
 	spin_lock_bh(&ctx->expq_lock);
 
-	list_for_each_entry(ack_recvd, &ctx->exp_rxq, node) {
+	list_for_each_entry_safe(ack_recvd, tmp, &ctx->exp_rxq, node) {
 		if (ack_recvd->ack.export_id == expect_ack->export_id &&
 			ack_recvd->ack.vcid_local == expect_ack->vcid_local &&
 			ack_recvd->ack.vcid_remote == expect_ack->vcid_remote) {
@@ -63,8 +63,8 @@ static int hab_export_ack_wait(struct uhab_context *ctx,
 
 	ret = wait_event_interruptible_timeout(ctx->exp_wq,
 		hab_export_ack_find(ctx, expect_ack),
-		HZ);
-	if (!ret || (ret == -ERESTARTSYS))
+		10*1000*1000);
+	if (!ret || (-ERESTARTSYS == ret))
 		ret = -EAGAIN;
 	else if (ret > 0)
 		ret = 0;
@@ -91,10 +91,10 @@ static struct export_desc *habmem_add_export(struct virtual_channel *vchan,
 		return NULL;
 
 	idr_preload(GFP_KERNEL);
-	spin_lock(&vchan->pchan->expid_lock);
+	spin_lock_bh(&vchan->pchan->expid_lock);
 	exp->export_id =
 		idr_alloc(&vchan->pchan->expid_idr, exp, 1, 0, GFP_NOWAIT);
-	spin_unlock(&vchan->pchan->expid_lock);
+	spin_unlock_bh(&vchan->pchan->expid_lock);
 	idr_preload_end();
 
 	exp->readonly = flags;
@@ -126,9 +126,9 @@ void habmem_remove_export(struct export_desc *exp)
 
 	pchan = exp->vchan->pchan;
 
-	spin_lock(&pchan->expid_lock);
+	spin_lock_bh(&pchan->expid_lock);
 	idr_remove(&pchan->expid_idr, exp->export_id);
-	spin_unlock(&pchan->expid_lock);
+	spin_unlock_bh(&pchan->expid_lock);
 
 	vfree(exp);
 }
@@ -197,10 +197,11 @@ static int habmem_export_vchan(struct uhab_context *ctx,
 	HAB_HEADER_SET_SIZE(header, sizebytes);
 	HAB_HEADER_SET_TYPE(header, HAB_PAYLOAD_TYPE_EXPORT);
 	HAB_HEADER_SET_ID(header, vchan->otherend_id);
+	HAB_HEADER_SET_SESSION_ID(header, vchan->session_id);
 	ret = physical_channel_send(vchan->pchan, &header, exp);
 
 	if (ret != 0) {
-		pr_err("failed to export payload to the remote %d\n", ret);
+		HAB_LOG_ERR("failed to export payload to the remote %d\n", ret);
 		return ret;
 	}
 
@@ -227,6 +228,8 @@ int hab_mem_export(struct uhab_context *ctx,
 
 	if (!ctx || !param || param->sizebytes > HAB_MAX_EXPORT_SIZE)
 		return -EINVAL;
+
+	HAB_LOG_INFO("vc %X, mem size %d\n", param->vcid, param->sizebytes);
 
 	vchan = hab_get_vchan_fromvcid(param->vcid, ctx);
 	if (!vchan || !vchan->pchan) {
@@ -255,7 +258,7 @@ int hab_mem_export(struct uhab_context *ctx,
 			pdata_exp);
 	}
 	if (ret < 0) {
-		pr_err("habmem_hyp_grant failed size=%d ret=%d\n",
+		HAB_LOG_ERR("habmem_hyp_grant failed size=%d ret=%d\n",
 			pdata_size, ret);
 		goto err;
 	}
@@ -303,7 +306,10 @@ int hab_mem_unexport(struct uhab_context *ctx,
 		return -EINVAL;
 
 	ret = habmem_hyp_revoke(exp->payload, exp->payload_count);
-
+	if (ret) {
+		HAB_LOG_ERR("Error found in revoke grant! ret %d", ret);
+		return ret;
+	}
 	habmem_remove_export(exp);
 	return ret;
 }
@@ -329,11 +335,15 @@ int hab_mem_import(struct uhab_context *ctx,
 	spin_unlock_bh(&ctx->imp_lock);
 
 	if (!found) {
-		pr_err("Fail to get export descriptor from export id %d\n",
+		HAB_LOG_ERR("Fail to get export descriptor from export id %d\n",
 			param->exportid);
 		ret = -ENODEV;
 		return ret;
 	}
+
+	HAB_LOG_INFO("call map id: %d pcnt %d remote_dom %d 1st_ref:0x%X\n",
+		exp->export_id, exp->payload_count, exp->domid_local,
+		*((uint32_t *)exp->payload));
 
 	ret = habmem_imp_hyp_map(ctx->import_ctx,
 		exp->payload,
@@ -344,11 +354,13 @@ int hab_mem_import(struct uhab_context *ctx,
 		kernel,
 		param->flags);
 	if (ret) {
-		pr_err("Import fail ret:%d pcnt:%d rem:%d 1st_ref:0x%X\n",
+		HAB_LOG_ERR("Import fail ret:%d pcnt:%d rem:%d 1st_ref:0x%X\n",
 			ret, exp->payload_count,
 			exp->domid_local, *((uint32_t *)exp->payload));
 		return ret;
 	}
+	HAB_LOG_INFO("import index %llx, kva %p, kernel %d\n",
+		exp->import_index, param->kva, kernel);
 
 	param->index = exp->import_index;
 	param->kva = (uint64_t)exp->kva;
@@ -373,6 +385,9 @@ int hab_mem_unimport(struct uhab_context *ctx,
 			list_del(&exp->node);
 			ctx->import_total--;
 			found = 1;
+
+			HAB_LOG_INFO("found id:%d payload cnt:%d kernel:%d\n",
+				exp->export_id, exp->payload_count, kernel);
 			break;
 		}
 	}
@@ -385,7 +400,10 @@ int hab_mem_unimport(struct uhab_context *ctx,
 			exp->import_index,
 			exp->payload_count,
 			kernel);
-
+		if (ret) {
+			HAB_LOG_ERR("unmap fail id:%d pcnt:%d kernel:%d\n",
+				exp->export_id, exp->payload_count, kernel);
+		}
 		param->kva = (uint64_t)exp->kva;
 		kfree(exp);
 	}

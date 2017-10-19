@@ -35,6 +35,7 @@ struct importer_context {
 	int cnt; /* pages allocated for local file */
 	struct list_head imp_list;
 	struct file *filp;
+	rwlock_t implist_lock;
 };
 
 void *habmm_hyp_allocate_grantable(int page_count,
@@ -73,13 +74,17 @@ static int habmem_get_dma_pages(unsigned long address,
 	int fd;
 
 	vma = find_vma(current->mm, address);
-	if (!vma || !vma->vm_file)
+	if (!vma || !vma->vm_file) {
+		HAB_LOG_ERR("cannot find vma %pK\n", vma);
 		goto err;
+	}
+
+	HAB_LOG_INFO("vma flags %lx\n", vma->vm_flags);
 
 	/* Look for the fd that matches this the vma file */
 	fd = iterate_fd(current->files, 0, match_file, vma->vm_file);
 	if (fd == 0) {
-		pr_err("iterate_fd failed\n");
+		HAB_LOG_ERR("cannot find fd %d\n", fd);
 		goto err;
 	}
 
@@ -90,19 +95,20 @@ static int habmem_get_dma_pages(unsigned long address,
 
 	attach = dma_buf_attach(dmabuf, hab_driver.dev);
 	if (IS_ERR_OR_NULL(attach)) {
-		pr_err("dma_buf_attach failed\n");
+		HAB_LOG_ERR("dma_buf_attach failed\n");
 		goto err;
 	}
 
 	sg_table = dma_buf_map_attachment(attach, DMA_TO_DEVICE);
 
 	if (IS_ERR_OR_NULL(sg_table)) {
-		pr_err("dma_buf_map_attachment failed\n");
+		HAB_LOG_ERR("dma_buf_map_attachment failed\n");
 		goto err;
 	}
 
 	for_each_sg(sg_table->sgl, s, sg_table->nents, i) {
 		page = sg_page(s);
+		HAB_LOG_INFO("sgl length %d\n", s->length);
 
 		for (j = page_offset; j < (s->length >> PAGE_SHIFT); j++) {
 			pages[rc] = nth_page(page, j);
@@ -135,7 +141,12 @@ err:
 		dma_buf_put(dmabuf);
 	return rc;
 }
-
+/* 
+ * exporter - grant & revoke
+ * degenerate sharabled page list based on CPU friendly virtual "address".
+ * The result as an array is stored in ppdata to return to caller
+ * page size 4KB is assumed
+ */
 int habmem_hyp_grant_user(unsigned long address,
 		int page_count,
 		int flags,
@@ -207,6 +218,10 @@ int habmem_hyp_grant(unsigned long address,
 	return 0;
 }
 
+/* 
+ * the previous returned array to describe the shared buffer is
+ * pass in to be released assumed it is integer array.
+ */
 int habmem_hyp_revoke(void *expdata, uint32_t count)
 {
 	return 0;
@@ -220,6 +235,7 @@ void *habmem_imp_hyp_open(void)
 	if (!priv)
 		return NULL;
 
+	rwlock_init(&priv->implist_lock);
 	INIT_LIST_HEAD(&priv->imp_list);
 
 	return priv;
@@ -261,7 +277,7 @@ long habmem_imp_hyp_map(void *imp_ctx,
 		uint32_t userflags)
 {
 	struct page **pages;
-	struct compressed_pfns *pfn_table = impdata;
+	struct compressed_pfns *pfn_table = (struct compressed_pfns *)impdata;
 	struct pages_list *pglist;
 	struct importer_context *priv = imp_ctx;
 	unsigned long pfn;
@@ -296,6 +312,11 @@ long habmem_imp_hyp_map(void *imp_ctx,
 	pglist->refcntk = pglist->refcntu = 0;
 	pglist->userflags = userflags;
 
+	for (i = 0; i < count; i++) {
+	  //HAB_LOG_INFO("page #%d imported physical %llX, pfn %lx\n",
+	  //i, page_to_phys(pages[i]), page_to_pfn(pages[i]));
+	}
+
 	*index = pglist->index << PAGE_SHIFT;
 
 	if (kernel) {
@@ -308,8 +329,11 @@ long habmem_imp_hyp_map(void *imp_ctx,
 		if (pglist->kva == NULL) {
 			vfree(pages);
 			kfree(pglist);
-			pr_err("%ld pages vmap failed\n", pglist->npages);
+			HAB_LOG_ERR("%ld pages vmap failed\n", pglist->npages);
 			return -ENOMEM;
+		} else {
+			HAB_LOG_INFO("%ld pages vmap pass, return %p\n",
+				pglist->npages, pglist->kva);
 		}
 
 		pglist->uva = NULL;
@@ -320,8 +344,11 @@ long habmem_imp_hyp_map(void *imp_ctx,
 		pglist->kva = NULL;
 	}
 
+	write_lock(&priv->implist_lock);
 	list_add_tail(&pglist->list,  &priv->imp_list);
 	priv->cnt++;
+	write_unlock(&priv->implist_lock);
+	HAB_LOG_INFO("index returned %llx\n", *index);
 
 	return 0;
 }
@@ -333,11 +360,15 @@ long habmm_imp_hyp_unmap(void *imp_ctx,
 		int kernel)
 {
 	struct importer_context *priv = imp_ctx;
-	struct pages_list *pglist;
+	struct pages_list *pglist, *tmp;
 	int found = 0;
 	uint64_t pg_index = index >> PAGE_SHIFT;
 
-	list_for_each_entry(pglist, &priv->imp_list, list) {
+	write_lock(&priv->implist_lock);
+	list_for_each_entry_safe(pglist, tmp, &priv->imp_list, list) {
+		//HAB_LOG_INFO("node pglist %p, kernel %d, pg_index %llx\n",
+		//	pglist, pglist->kernel, pg_index);
+
 		if (kernel) {
 			if (pglist->kva == (void *)((uintptr_t)index))
 				found  = 1;
@@ -353,10 +384,14 @@ long habmm_imp_hyp_unmap(void *imp_ctx,
 		}
 	}
 
+	write_unlock(&priv->implist_lock);
 	if (!found) {
-		pr_err("failed to find export id on index %llx\n", index);
+		HAB_LOG_ERR("failed to find export id on index %llx\n", index);
 		return -EINVAL;
 	}
+
+	HAB_LOG_INFO("detach pglist %p, index %llx, kernel %d, list cnt %d\n",
+		pglist, pglist->index, pglist->kernel, priv->cnt);
 
 	if (kernel)
 		if (pglist->kva)
@@ -371,6 +406,7 @@ long habmm_imp_hyp_unmap(void *imp_ctx,
 static int hab_map_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 {
 	struct page *page;
+	//long length = vma->vm_end - vma->vm_start;
 	struct pages_list *pglist;
 
 	unsigned long offset = vma->vm_pgoff << PAGE_SHIFT;
@@ -381,6 +417,9 @@ static int hab_map_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 	unsigned long fault_index = fault_offset>>PAGE_SHIFT;
 	int page_idx;
 
+	//HAB_LOG_INFO("nopage start %lX len %ld index %lX fault off %lX\n",
+	//vma->vm_start, length, vma->vm_pgoff, fault_offset);
+
 	if (vma == NULL)
 		return VM_FAULT_SIGBUS;
 
@@ -388,10 +427,12 @@ static int hab_map_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 
 	page_idx = fault_index - pglist->index;
 	if (page_idx < 0 || page_idx >= pglist->npages) {
-		pr_err("Out of page array. page_idx %d, pg cnt %ld",
+		HAB_LOG_ERR("Out of page array! page_idx %d, pg cnt %ld",
 			page_idx, pglist->npages);
 		return VM_FAULT_SIGBUS;
 	}
+
+	//HAB_LOG_INFO("Fault page index %d\n", page_idx);
 
 	page = pglist->pages[page_idx];
 	get_page(page);
@@ -408,7 +449,6 @@ static void hab_map_close(struct vm_area_struct *vma)
 }
 
 static const struct vm_operations_struct habmem_vm_ops = {
-
 	.fault = hab_map_fault,
 	.open = hab_map_open,
 	.close = hab_map_close,
@@ -419,23 +459,29 @@ int habmem_imp_hyp_mmap(struct file *filp, struct vm_area_struct *vma)
 	struct uhab_context *ctx = (struct uhab_context *) filp->private_data;
 	struct importer_context *imp_ctx = ctx->import_ctx;
 	long length = vma->vm_end - vma->vm_start;
+	unsigned long start = vma->vm_start;
 	struct pages_list *pglist;
 	int bfound = 0;
 
+	HAB_LOG_INFO("mmap request start %lX, len %ld, index %lX\n",
+		start, length, vma->vm_pgoff);
+
+	read_lock(&imp_ctx->implist_lock);
 	list_for_each_entry(pglist, &imp_ctx->imp_list, list) {
 		if (pglist->index == vma->vm_pgoff) {
 			bfound = 1;
 			break;
 		}
 	}
+	read_unlock(&imp_ctx->implist_lock);
 
 	if (!bfound) {
-		pr_err("Failed to find pglist vm_pgoff: %d\n", vma->vm_pgoff);
+		HAB_LOG_ERR("Failed to find pglist\n");
 		return -EINVAL;
 	}
 
 	if (length > pglist->npages * PAGE_SIZE) {
-		pr_err("Error vma length %ld not matching page list %ld\n",
+		HAB_LOG_ERR("Error vma length %ld not matching page list %ld\n",
 			length, pglist->npages * PAGE_SIZE);
 		return -EINVAL;
 	}

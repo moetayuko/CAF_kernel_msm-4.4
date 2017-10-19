@@ -14,8 +14,8 @@
 #define HAB_PIPE_H
 
 struct hab_shared_buf {
-	uint32_t rd_count;
-	uint32_t wr_count;
+	volatile uint32_t rd_count;
+	volatile uint32_t wr_count;
 	uint32_t size;
 	unsigned char data[];
 };

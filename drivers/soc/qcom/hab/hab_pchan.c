@@ -31,11 +31,13 @@ hab_pchan_alloc(struct hab_device *habdev, int otherend_id)
 	pchan->closed = 1;
 	pchan->hyp_data = NULL;
 
+	INIT_LIST_HEAD(&pchan->vchannels);
 	spin_lock_init(&pchan->rxbuf_lock);
 
-	mutex_lock(&habdev->pchan_lock);
+	spin_lock(&habdev->pchan_lock);
 	list_add_tail(&pchan->node, &habdev->pchannels);
-	mutex_unlock(&habdev->pchan_lock);
+	habdev->pchan_cnt++;
+	spin_unlock(&habdev->pchan_lock);
 
 	return pchan;
 }
@@ -45,9 +47,10 @@ static void hab_pchan_free(struct kref *ref)
 	struct physical_channel *pchan =
 		container_of(ref, struct physical_channel, refcount);
 
-	mutex_lock(&pchan->habdev->pchan_lock);
+	spin_lock(&pchan->habdev->pchan_lock);
 	list_del(&pchan->node);
-	mutex_unlock(&pchan->habdev->pchan_lock);
+	pchan->habdev->pchan_cnt--;
+	spin_unlock(&pchan->habdev->pchan_lock);
 	kfree(pchan->hyp_data);
 	kfree(pchan);
 }
@@ -57,18 +60,21 @@ hab_pchan_find_domid(struct hab_device *dev, int dom_id)
 {
 	struct physical_channel *pchan;
 
-	mutex_lock(&dev->pchan_lock);
+	spin_lock(&dev->pchan_lock);
 	list_for_each_entry(pchan, &dev->pchannels, node)
-		if (pchan->dom_id == dom_id)
+		if (pchan->dom_id == dom_id || dom_id == HABCFG_VMID_DONT_CARE)
 			break;
 
-	if (pchan->dom_id != dom_id)
+	if (pchan->dom_id != dom_id && dom_id != HABCFG_VMID_DONT_CARE) {
+		HAB_LOG_ERR("dom_id mismatch requested %d, existing %d\n",
+			dom_id, pchan->dom_id);
 		pchan = NULL;
+	}
 
 	if (pchan && !kref_get_unless_zero(&pchan->refcount))
 		pchan = NULL;
 
-	mutex_unlock(&dev->pchan_lock);
+	spin_unlock(&dev->pchan_lock);
 
 	return pchan;
 }
