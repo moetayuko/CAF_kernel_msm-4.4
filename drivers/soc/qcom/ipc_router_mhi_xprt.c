@@ -51,6 +51,11 @@ struct ipc_router_mhi_addr_map {
 	struct rr_packet *pkt;
 };
 
+struct ipc_router_mhi_result {
+	struct list_head list_node;
+	struct mhi_result *result;
+};
+
 /**
  * ipc_router_mhi_channel - MHI Channel related information
  * @out_chan_id: Out channel ID for use by IPC ROUTER enumerated in MHI driver.
@@ -127,6 +132,8 @@ struct ipc_router_mhi_xprt {
 	struct list_head tx_addr_map_list;
 	spinlock_t rx_addr_map_list_lock;
 	struct list_head rx_addr_map_list;
+	spinlock_t mhi_result_list_lock;
+	struct list_head mhi_result_list;
 };
 
 struct ipc_router_mhi_xprt_work {
@@ -474,8 +481,8 @@ static void mhi_xprt_read_data(struct work_struct *work)
 	struct sk_buff *skb;
 	struct ipc_router_mhi_xprt *mhi_xprtp =
 		container_of(work, struct ipc_router_mhi_xprt, read_work);
-	struct mhi_result result;
-	int rc;
+	struct ipc_router_mhi_result *rp;
+	unsigned long flags;
 
 	mutex_lock(&mhi_xprtp->ch_hndl.state_lock);
 	if (!mhi_xprtp->ch_hndl.in_chan_enabled) {
@@ -491,17 +498,20 @@ static void mhi_xprt_read_data(struct work_struct *work)
 	mutex_unlock(&mhi_xprtp->ch_hndl.state_lock);
 
 	while (1) {
-		rc = mhi_poll_inbound(mhi_xprtp->ch_hndl.in_handle, &result);
-		if (rc || !result.buf_addr || !result.bytes_xferd) {
-			if (rc != -ENODATA)
-				IPC_RTR_ERR("%s: Poll failed %s:%d:%p:%u\n",
-					__func__, mhi_xprtp->xprt_name, rc,
-					result.buf_addr,
-					(unsigned int) result.bytes_xferd);
+
+		spin_lock_irqsave(&mhi_xprtp->mhi_result_list_lock, flags);
+		if (list_empty(&mhi_xprtp->mhi_result_list)) {
+			spin_unlock_irqrestore(&mhi_xprtp->mhi_result_list_lock, flags);
 			break;
 		}
-		data_addr = result.buf_addr;
-		data_sz = result.bytes_xferd;
+		rp = list_first_entry(&mhi_xprtp->mhi_result_list,
+				struct ipc_router_mhi_result, list_node);
+
+		data_addr = rp->result->buf_addr;
+		data_sz = rp->result->bytes_xferd;
+		list_del(&rp->list_node);
+		kfree(rp);
+		spin_unlock_irqrestore(&mhi_xprtp->mhi_result_list_lock, flags);
 
 		/* Create a new rr_packet, if first fragment */
 		if (!mhi_xprtp->ch_hndl.bytes_to_rx) {
@@ -702,6 +712,8 @@ static void mhi_xprt_disable_event(struct ipc_router_mhi_xprt_work *xprt_work)
 static void mhi_xprt_xfer_event(struct mhi_cb_info *cb_info)
 {
 	struct ipc_router_mhi_xprt *mhi_xprtp;
+	struct ipc_router_mhi_result *rp;
+	unsigned long flags;
 	void *out_addr;
 
 	mhi_xprtp = (struct ipc_router_mhi_xprt *)(cb_info->result->user_data);
@@ -713,6 +725,15 @@ static void mhi_xprt_xfer_event(struct mhi_cb_info *cb_info)
 					out_addr);
 		wake_up(&mhi_xprtp->write_wait_q);
 	} else if (cb_info->chan == mhi_xprtp->ch_hndl.in_chan_id) {
+		rp = kmalloc(sizeof(*rp), GFP_ATOMIC);
+		if (!rp) {
+			IPC_RTR_ERR("%s: No memory for list buffer\n", __func__);
+			return;
+		}
+		rp->result = cb_info->result;
+		spin_lock_irqsave(&mhi_xprtp->mhi_result_list_lock, flags);
+		list_add_tail(&rp->list_node, &mhi_xprtp->mhi_result_list);
+		spin_unlock_irqrestore(&mhi_xprtp->mhi_result_list_lock, flags);
 		queue_work(mhi_xprtp->wq, &mhi_xprtp->read_work);
 	} else {
 		IPC_RTR_ERR("%s: chan_id %d not part of %s\n",
@@ -874,6 +895,8 @@ static int ipc_router_mhi_config_init(
 	spin_lock_init(&mhi_xprtp->tx_addr_map_list_lock);
 	INIT_LIST_HEAD(&mhi_xprtp->rx_addr_map_list);
 	spin_lock_init(&mhi_xprtp->rx_addr_map_list_lock);
+	INIT_LIST_HEAD(&mhi_xprtp->mhi_result_list);
+	spin_lock_init(&mhi_xprtp->mhi_result_list_lock);
 
 	rc = ipc_router_mhi_driver_register(mhi_xprtp, dev);
 	return rc;

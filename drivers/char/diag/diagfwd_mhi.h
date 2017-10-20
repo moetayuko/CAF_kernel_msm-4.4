@@ -70,6 +70,7 @@ struct diag_mhi_info {
 	uint8_t enabled;
 	char name[DIAG_MHI_NAME_SZ];
 	struct work_struct read_work;
+	struct list_head read_done_list;
 	struct work_struct read_done_work;
 	struct work_struct open_work;
 	struct work_struct close_work;
