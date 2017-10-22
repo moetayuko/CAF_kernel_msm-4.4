@@ -70,6 +70,8 @@ enum sde_rm_topology_control {
  * @hw_mdp: hardware object for mdp_top
  * @lm_max_width: cached layer mixer maximum width
  * @rsvp_next_seq: sequence number for next reservation for debugging purposes
+ * @spin_lock: sde_rm_reserve can be accessed simultaneously my multiple
+ *	threads. Add lock to protect it otherwise atomic commit may fail.
  */
 struct sde_rm {
 	struct drm_device *dev;
@@ -78,6 +80,7 @@ struct sde_rm {
 	struct sde_hw_mdp *hw_mdp;
 	uint32_t lm_max_width;
 	uint32_t rsvp_next_seq;
+	struct mutex lock;
 };
 
 /**

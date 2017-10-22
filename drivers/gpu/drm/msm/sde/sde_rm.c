@@ -290,6 +290,7 @@ int sde_rm_destroy(struct sde_rm *rm)
 
 	sde_hw_mdp_destroy(rm->hw_mdp);
 	rm->hw_mdp = NULL;
+	mutex_destroy(&rm->lock);
 
 	return 0;
 }
@@ -495,6 +496,7 @@ int sde_rm_init(struct sde_rm *rm,
 		}
 	}
 
+	mutex_init(&rm->lock);
 	return 0;
 
 fail:
@@ -1125,15 +1127,19 @@ void sde_rm_release(struct sde_rm *rm, struct drm_encoder *enc)
 		return;
 	}
 
+	mutex_lock(&rm->lock);
+
 	rsvp = _sde_rm_get_rsvp(rm, enc);
 	if (!rsvp) {
 		SDE_ERROR("failed to find rsvp for enc %d\n", enc->base.id);
+		mutex_unlock(&rm->lock);
 		return;
 	}
 
 	conn = _sde_rm_get_connector(enc);
 	if (!conn) {
 		SDE_ERROR("failed to get connector for enc %d\n", enc->base.id);
+		mutex_unlock(&rm->lock);
 		return;
 	}
 
@@ -1154,6 +1160,8 @@ void sde_rm_release(struct sde_rm *rm, struct drm_encoder *enc)
 				CONNECTOR_PROP_TOPOLOGY_NAME,
 				SDE_RM_TOPOLOGY_UNKNOWN);
 	}
+
+	mutex_unlock(&rm->lock);
 }
 
 static int _sde_rm_commit_rsvp(
@@ -1232,12 +1240,15 @@ int sde_rm_reserve(
 			crtc_state->crtc->base.id, test_only);
 	SDE_EVT32(enc->base.id, conn_state->connector->base.id);
 
+	mutex_lock(&rm->lock);
+
 	_sde_rm_print_rsvps(rm, SDE_RM_STAGE_BEGIN);
 
 	ret = _sde_rm_populate_requirements(rm, enc, crtc_state,
 			conn_state, &reqs);
 	if (ret) {
 		SDE_ERROR("failed to populate hw requirements\n");
+		mutex_unlock(&rm->lock);
 		return ret;
 	}
 
@@ -1253,8 +1264,10 @@ int sde_rm_reserve(
 	 * replace the current with the next.
 	 */
 	rsvp_nxt = kzalloc(sizeof(*rsvp_nxt), GFP_KERNEL);
-	if (!rsvp_nxt)
+	if (!rsvp_nxt) {
+		mutex_unlock(&rm->lock);
 		return -ENOMEM;
+	}
 
 	rsvp_cur = _sde_rm_get_rsvp(rm, enc);
 
@@ -1306,5 +1319,6 @@ int sde_rm_reserve(
 
 	_sde_rm_print_rsvps(rm, SDE_RM_STAGE_FINAL);
 
+	mutex_unlock(&rm->lock);
 	return ret;
 }
