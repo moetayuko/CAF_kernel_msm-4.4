@@ -257,6 +257,7 @@ static void recover_worker(struct work_struct *work)
 		retire_guilty_submit(gpu, gpu->funcs->active_ring(gpu));
 
 		/* Recover the GPU */
+		pm_runtime_get_sync(&gpu->pdev->dev);
 		gpu->funcs->recover(gpu);
 		/* Decrement the device usage count for the guilty submit */
 		pm_runtime_put_sync_autosuspend(&gpu->pdev->dev);
