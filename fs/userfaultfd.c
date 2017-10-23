@@ -29,6 +29,7 @@
 #include <linux/ioctl.h>
 #include <linux/security.h>
 #include <linux/hugetlb.h>
+#include <linux/freezer.h>
 
 static struct kmem_cache *userfaultfd_ctx_cachep __read_mostly;
 
@@ -481,6 +482,7 @@ int handle_userfault(struct vm_fault *vmf, unsigned long reason)
 		   (return_to_userland ? !signal_pending(current) :
 		    !fatal_signal_pending(current)))) {
 		wake_up_poll(&ctx->fd_wqh, POLLIN);
+		freezer_do_not_count();
 		schedule();
 		ret |= VM_FAULT_MAJOR;
 
@@ -504,11 +506,13 @@ int handle_userfault(struct vm_fault *vmf, unsigned long reason)
 			    (return_to_userland ? signal_pending(current) :
 			     fatal_signal_pending(current)))
 				break;
+
 			schedule();
 		}
 	}
 
-	__set_current_state(TASK_RUNNING);
+	set_current_state(TASK_RUNNING);
+	freezer_count();
 
 	if (return_to_userland) {
 		if (signal_pending(current) &&
