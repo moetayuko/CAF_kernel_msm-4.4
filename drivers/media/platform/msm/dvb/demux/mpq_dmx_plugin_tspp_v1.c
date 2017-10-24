@@ -83,9 +83,9 @@ enum mem_buffer_allocation_mode {
 };
 
 /* module parameters for load time configuration */
-static int allocation_mode = MPQ_DMX_TSPP_INTERNAL_ALLOC;
+static int allocation_mode = MPQ_DMX_TSPP_CONTIGUOUS_PHYS_ALLOC;
 static int tspp_out_buffer_size = TSPP_BUFFER_SIZE;
-static int tspp_desc_size = TSPP_DEFAULT_DESCRIPTOR_SIZE;
+static int tspp_desc_size = (170 * TSPP_DEFAULT_DESCRIPTOR_SIZE);
 static int tspp_notification_size =
 	TSPP_NOTIFICATION_SIZE(TSPP_DEFAULT_DESCRIPTOR_SIZE);
 static int tspp_channel_timeout = TSPP_CHANNEL_TIMEOUT;
