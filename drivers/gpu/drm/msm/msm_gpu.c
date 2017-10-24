@@ -327,17 +327,6 @@ out:
 		hangcheck_timer_reset(gpu);
 
 	/* workaround for missing irq: */
-	if (gpu->funcs->preempt_trigger) {
-		/*
-		 * Add usage count to previous suspend occurered while access
-		 * registers in below. If already suspended, TS_FLUSH events
-		 * should occurred for every commands.
-		 */
-		pm_runtime_get_noresume(&gpu->pdev->dev);
-		if (pm_runtime_status_suspended(&gpu->pdev->dev) == false)
-			gpu->funcs->preempt_trigger(gpu);
-		pm_runtime_put_noidle(&gpu->pdev->dev);
-	}
 	queue_work(priv->wq, &gpu->retire_work);
 }
 
@@ -827,6 +816,7 @@ int msm_gpu_init(struct drm_device *drm, struct platform_device *pdev,
 	INIT_LIST_HEAD(&gpu->active_list);
 	INIT_WORK(&gpu->retire_work, retire_worker);
 	INIT_WORK(&gpu->recover_work, recover_worker);
+
 
 	setup_timer(&gpu->hangcheck_timer, hangcheck_handler,
 			(unsigned long)gpu);

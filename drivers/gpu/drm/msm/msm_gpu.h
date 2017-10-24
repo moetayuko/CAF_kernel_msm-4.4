@@ -67,7 +67,6 @@ struct msm_gpu_funcs {
 	uint32_t (*submitted_fence)(struct msm_gpu *gpu,
 			struct msm_ringbuffer *ring);
 	struct msm_ringbuffer *(*active_ring)(struct msm_gpu *gpu);
-	void (*preempt_trigger)(struct msm_gpu *gpu);
 	void (*recover)(struct msm_gpu *gpu);
 	void (*destroy)(struct msm_gpu *gpu);
 #ifdef CONFIG_DEBUG_FS

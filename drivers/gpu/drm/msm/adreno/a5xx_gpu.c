@@ -1273,7 +1273,6 @@ static const struct adreno_gpu_funcs funcs = {
 		.submit = a5xx_submit,
 		.flush = a5xx_flush,
 		.active_ring = a5xx_active_ring,
-		.preempt_trigger = a5xx_preempt_trigger,
 		.irq = a5xx_irq,
 		.destroy = a5xx_destroy,
 #ifdef CONFIG_DEBUG_FS
