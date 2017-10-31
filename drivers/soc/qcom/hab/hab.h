@@ -83,7 +83,7 @@ enum hab_payload_type {
 #define DEVICE_AUD2_NAME "hab_aud2"
 #define DEVICE_AUD3_NAME "hab_aud3"
 #define DEVICE_AUD4_NAME "hab_aud4"
-#define DEVICE_CAM1_NAME "hab_cam1"
+#define DEVICE_CAM1_NAME "hab_cam"
 #define DEVICE_CAM2_NAME "hab_cam2"
 #define DEVICE_DISP1_NAME "hab_disp1"
 #define DEVICE_DISP2_NAME "hab_disp2"
