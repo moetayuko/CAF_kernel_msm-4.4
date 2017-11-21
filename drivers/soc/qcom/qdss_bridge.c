@@ -182,45 +182,53 @@ static int mhi_queue_read(struct qdss_bridge_drvdata *drvdata)
 }
 
 static int usb_write(struct qdss_bridge_drvdata *drvdata,
-			     struct mhi_result *result)
+			    unsigned char *buf, int len)
 {
 	int ret = 0;
 	struct qdss_buf_tbl_lst *entry;
 
-	entry = qdss_get_buf_tbl_entry(drvdata, result->buf_addr);
+	entry = qdss_get_buf_tbl_entry(drvdata, buf);
 	if (!entry)
 		return -EINVAL;
 
-	entry->usb_req->buf = result->buf_addr;
-	entry->usb_req->length = result->bytes_xferd;
-	ret = usb_qdss_data_write(drvdata->usb_ch, entry->usb_req);
+	entry->usb_req->buf = buf;
+	entry->usb_req->length = len;
+	ret = usb_qdss_write(drvdata->usb_ch, entry->usb_req);
 
 	return ret;
 }
 
 static void mhi_read_done_work_fn(struct work_struct *work)
 {
+	struct qdss_buf_tbl_lst_t *entry;
 	unsigned char *buf = NULL;
-	struct mhi_result result;
 	int err = 0;
+	int len;
 	struct qdss_bridge_drvdata *drvdata =
 				container_of(work,
 					     struct qdss_bridge_drvdata,
 					     read_done_work);
 
 	do {
-		err = mhi_poll_inbound(drvdata->hdl, &result);
-		if (err) {
-			pr_debug("MHI poll failed err:%d\n", err);
+		if (!drvdata->opened)
 			break;
-		}
-		buf = result.buf_addr;
+
+		if (list_empty(&drvdata->read_done_list))
+			break;
+		entry = list_first_entry(&drvdata->read_done_list,
+				struct qdss_buf_tbl_lst_t, link);
+		list_del(&entry->link);
+		buf = entry->buf;
+		len = entry->len;
+		kfree(entry);
+
 		if (!buf)
 			break;
-		err = usb_write(drvdata, &result);
+		err = usb_write(drvdata, buf, len);
+
 		if (err)
 			qdss_buf_tbl_remove(drvdata, buf);
-	} while (1);
+	} while (buf);
 }
 
 static void usb_write_done(struct qdss_bridge_drvdata *drvdata,
@@ -316,6 +324,7 @@ static void mhi_notifier(struct mhi_cb_info *cb_info)
 {
 	struct mhi_result *result;
 	struct qdss_bridge_drvdata *drvdata;
+	struct qdss_buf_tbl_lst_t *entry;
 
 	if (!cb_info)
 		return;
@@ -340,6 +349,16 @@ static void mhi_notifier(struct mhi_cb_info *cb_info)
 	case MHI_CB_XFER:
 		if (!drvdata->opened)
 			break;
+
+		entry = kzalloc(sizeof(*entry), GFP_ATOMIC);
+		if (!entry) {
+			pr_err("diag: In %s, no mem for list\n", __func__);
+			break;
+		}
+
+		entry->buf = cb_info->result->buf_addr;
+		entry->len = cb_info->result->bytes_xferd;
+		list_add_tail(&entry->link, &drvdata->read_done_list);
 
 		queue_work(drvdata->mhi_wq, &drvdata->read_done_work);
 		break;
@@ -396,6 +415,7 @@ int qdss_mhi_init(struct qdss_bridge_drvdata *drvdata)
 	INIT_WORK(&(drvdata->open_work), qdss_bridge_open_work_fn);
 	INIT_WORK(&(drvdata->close_work), mhi_close_work_fn);
 	INIT_LIST_HEAD(&drvdata->buf_tbl);
+	INIT_LIST_HEAD(&drvdata->read_done_list);
 	drvdata->opened = 0;
 
 	ret = qdss_mhi_register_ch(drvdata);
