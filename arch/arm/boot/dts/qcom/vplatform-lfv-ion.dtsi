@@ -16,12 +16,6 @@
 		#address-cells = <1>;
 		#size-cells = <0>;
 
-		system_heap: qcom,ion-heap@25 {
-			reg = <25>;
-			memory-region = <&ion_system>;
-			qcom,ion-heap-type = "CARVEOUT";
-		};
-
 		qcom,ion-heap@27 { /* QSEECOM HEAP */
 			reg = <27>;
 			memory-region = <&qseecom_mem>;

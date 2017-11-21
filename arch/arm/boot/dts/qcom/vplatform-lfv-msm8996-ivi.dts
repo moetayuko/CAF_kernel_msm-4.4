@@ -24,6 +24,18 @@
 };
 
 &soc {
+	qcom,ion {
+		compatible = "qcom,msm-ion";
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		system_heap: qcom,ion-heap@25 {
+			reg = <25>;
+			memory-region = <&ion_system>;
+			qcom,ion-heap-type = "CARVEOUT";
+		};
+	};
+
 	qcom,msm-audio-ion-vm {
 		compatible = "qcom,msm-audio-ion-vm";
 		qcom,smmu-enabled;
@@ -40,4 +52,15 @@
 
 &blsp1_uart2 {
 	status = "okay";
+};
+
+&reserved_memory {
+		pmem_shared: pmem_shared_region {
+			reg = <0 0xd0000000 0 0x20000000>;
+			label = "pmem_shared_mem";
+		};
+		ion_system: ion_system_region {
+			reg = <0x1 0x0 0 0x10000000>;
+			label = "ion_system_mem";
+		};
 };
