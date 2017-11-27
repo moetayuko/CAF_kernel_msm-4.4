@@ -675,6 +675,13 @@ static int arm_spe_pmu_event_init(struct perf_event *event)
 		return -EOPNOTSUPP;
 
 	/*
+	 * If kernelspace is unmapped when running at EL0, then the SPE
+	 * buffer will fault and prematurely terminate the AUX session.
+	 */
+	if (arm64_kernel_unmapped_at_el0() && !attr->exclude_user)
+		dev_warn_once(&spe_pmu->pdev->dev, "unable to write to profiling buffer from EL0. Try passing \"kaiser=off\" on the kernel command line");
+
+	/*
 	 * Feedback-directed frequency throttling doesn't work when we
 	 * have a buffer of samples. We'd need to manually count the
 	 * samples in the buffer when it fills up and adjust the event
