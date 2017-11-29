@@ -41,7 +41,7 @@
  */
 
 
-/**
+/*
  * struct ttm_object_file
  *
  * @tdev: Pointer to the ttm_object_device.
