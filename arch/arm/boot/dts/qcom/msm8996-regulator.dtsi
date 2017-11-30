@@ -368,6 +368,13 @@
 	/* PM8994 LDO26 = VDD_SS_CX supply */
 	rpm-regulator-ldoa26 {
 		status = "okay";
+		pm8994_l26: regulator-l26 {
+			regulator-min-microvolt = <1100000>;
+			regulator-max-microvolt = <1100000>;
+			qcom,init-voltage = <1100000>;
+			status = "okay";
+		};
+
 		pm8994_l26_corner: regulator-l26-corner {
 			compatible = "qcom,rpm-smd-regulator";
 			regulator-name = "pm8994_l26_corner";
