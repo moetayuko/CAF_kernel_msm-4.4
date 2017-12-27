@@ -98,3 +98,14 @@
 			label = "ion_system_mem";
 		};
 };
+
+#include "vplatform-lfv-msm8996-usb.dtsi"
+
+&usb_detect {
+	qcom,force-vbus-status-off;
+};
+
+&usb3 {
+	status = "okay";
+	qcom,no-wakeup-src-in-hostmode;
+};
