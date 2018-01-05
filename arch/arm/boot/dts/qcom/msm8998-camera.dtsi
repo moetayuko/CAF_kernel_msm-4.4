@@ -16,7 +16,7 @@
 		compatible = "qcom,msm-cam";
 		reg = <0x8c0000 0x40000>;
 		reg-names = "msm-cam";
-		status = "ok";
+		status = "disabled";
 		bus-vectors = "suspend", "svs", "nominal", "turbo";
 		qcom,bus-votes = <0 300000000 640000000 640000000>;
 	};
@@ -53,7 +53,7 @@
 			"camss_ispif_ahb_clk", "csiphy_clk_src", "csiphy_clk";
 		qcom,clock-rates = <0 0 0 0 0 0 274290000 0 0 200000000 0
 			0 274290000 0>;
-		status = "ok";
+		status = "disabled";
 	};
 
 	qcom,csiphy@ca35000 {
@@ -88,7 +88,7 @@
 			"camss_ispif_ahb_clk", "csiphy_clk_src", "csiphy_clk";
 		qcom,clock-rates = <0 0 0 0 0 0 274290000 0 0 200000000 0
 			0 274290000 0>;
-		status = "ok";
+		status = "disabled";
 	};
 
 	qcom,csiphy@ca36000 {
@@ -123,7 +123,7 @@
 			"camss_ispif_ahb_clk", "csiphy_clk_src", "csiphy_clk";
 		qcom,clock-rates = <0 0 0 0 0 0 274290000 0 0 200000000 0
 			0 274290000 0>;
-		status = "ok";
+		status = "disabled";
 	};
 
 	qcom,csid@ca30000  {
@@ -161,7 +161,7 @@
 			"csi_pix_clk", "cphy_csid_clk";
 		qcom,clock-rates = <0 0 0 0 0 0 0 274290000 274290000
 			0 0 0 0 0>;
-		status = "ok";
+		status = "disabled";
 	};
 
 	qcom,csid@ca30400 {
@@ -199,7 +199,7 @@
 			"csi_pix_clk", "cphy_csid_clk";
 		qcom,clock-rates = <0 0 0 0 0 0 0 274290000 274290000
 			 0 0 0 0 0>;
-		status = "ok";
+		status = "disabled";
 	};
 
 	qcom,csid@ca30800 {
@@ -237,7 +237,7 @@
 			"csi_pix_clk", "cphy_csid_clk";
 		qcom,clock-rates = <0 0 0 0 0 0 0 274290000 274290000
 			 0 0 0 0 0>;
-		status = "ok";
+		status = "disabled";
 	};
 
 	qcom,csid@ca30c00 {
@@ -275,12 +275,12 @@
 			"csi_pix_clk", "cphy_csid_clk";
 		qcom,clock-rates = <0 0 0 0 0 0 0 274290000 274290000
 			 0 0 0 0 0>;
-		status = "ok";
+		status = "disabled";
 	};
 
 	qcom,cam_smmu {
 		compatible = "qcom,msm-cam-smmu";
-		status = "ok";
+		status = "disabled";
 
 		msm_cam_smmu_cb1 {
 			compatible = "qcom,msm-cam-smmu-cb";
@@ -370,7 +370,7 @@
 			<0x2c 0x10000000 0x30000000>;
 		qcom,fd-misc-reg-settings = <0x20 0x2 0x3>,
 			<0x24 0x2 0x3>;
-		status = "ok";
+		status = "disabled";
 	};
 
 	qcom,cpp@ca04000 {
@@ -424,7 +424,7 @@
 			<0x584 0x03333333>,
 			<0x588 0x33333333>,
 			<0x58c 0x03333333>;
-		status = "ok";
+		status = "disabled";
 		qcom,msm-bus,name = "msm_camera_cpp";
 		qcom,msm-bus,num-cases = <2>;
 		qcom,msm-bus,num-paths = <1>;
@@ -538,7 +538,7 @@
 			"NO_SET_RATE", "NO_SET_RATE",
 			"INIT_RATE",
 			"NO_SET_RATE", "NO_SET_RATE";
-		status = "ok";
+		status = "disabled";
 	};
 
 	vfe0: qcom,vfe0@ca10000 {
@@ -576,7 +576,7 @@
 		qcom,clock-rates = <0 0 0 0 0 0 480000000 0 0 0 0 0 0
 					0 0 0 0 0 0 576000000 0 0 0 0 0 0
 					0 0 0 0 0 0 600000000 0 0 0 0 0 0>;
-		status = "ok";
+		status = "disabled";
 		qos-entries = <8>;
 		qos-regs = <0x404 0x408 0x40c 0x410 0x414 0x418
 			0x41c 0x420>;
@@ -656,7 +656,7 @@
 		qcom,clock-rates = <0 0 0 0 0 0 480000000 0 0 0 0 0 0
 					0 0 0 0 0 0 576000000 0 0 0 0 0 0
 					0 0 0 0 0 0 600000000 0 0 0 0 0 0>;
-		status = "ok";
+		status = "disabled";
 		qos-entries = <8>;
 		qos-regs = <0x404 0x408 0x40c 0x410 0x414 0x418
 			0x41c 0x420>;
@@ -715,7 +715,7 @@
 		reg-names = "cci";
 		interrupts = <0 295 0>;
 		interrupt-names = "cci";
-		status = "ok";
+		status = "disabled";
 		mmagic-supply = <&gdsc_bimc_smmu>;
 		gdscr-supply = <&gdsc_camss_top>;
 		qcom,cam-vreg-name = "mmagic", "gdscr";
@@ -801,7 +801,7 @@
 		qcom,msm-bus,num-paths = <1>;
 		qcom,msm-bus,vectors-KBps = <62 512 0 0>,
 			<62 512 1920000 2880000>;
-		status = "ok";
+		status = "disabled";
 	};
 
 	qcom,jpeg@caa0000 {
@@ -844,7 +844,7 @@
 		qcom,msm-bus,vectors-KBps = <62 512 0 0>,
 			<62 512 1920000 2880000>;
 		qcom,max-ds-factor = <128>;
-		status = "ok";
+		status = "disabled";
 	};
 };
 
@@ -860,7 +860,7 @@
 	qcom,hw-trdhld = <6>;
 	qcom,hw-tsp = <3>;
 	qcom,cci-clk-src = <37500000>;
-	status = "ok";
+	status = "disabled";
 };
 
 &i2c_freq_400Khz {
@@ -875,7 +875,7 @@
 	qcom,hw-trdhld = <6>;
 	qcom,hw-tsp = <3>;
 	qcom,cci-clk-src = <37500000>;
-	status = "ok";
+	status = "disabled";
 };
 
 &i2c_freq_custom {
@@ -890,7 +890,7 @@
 	qcom,hw-trdhld = <6>;
 	qcom,hw-tsp = <3>;
 	qcom,cci-clk-src = <37500000>;
-	status = "ok";
+	status = "disabled";
 };
 
 &i2c_freq_1Mhz {
@@ -905,5 +905,5 @@
 	qcom,hw-trdhld = <3>;
 	qcom,hw-tsp = <3>;
 	qcom,cci-clk-src = <37500000>;
-	status = "ok";
+	status = "disabled";
 };

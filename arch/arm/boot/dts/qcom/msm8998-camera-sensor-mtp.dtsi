@@ -18,7 +18,7 @@
 		qcom,flash-source = <&pmi8998_flash0 &pmi8998_flash1>;
 		qcom,torch-source = <&pmi8998_torch0 &pmi8998_torch1>;
 		qcom,switch-source = <&pmi8998_switch0>;
-		status = "ok";
+		status = "disabled";
 	};
 
 	led_flash1: qcom,camera-flash@1 {
@@ -27,7 +27,7 @@
 		qcom,flash-source = <&pmi8998_flash2>;
 		qcom,torch-source = <&pmi8998_torch2>;
 		qcom,switch-source = <&pmi8998_switch1>;
-		status = "ok";
+		status = "disabled";
 	};
 
 	actuator_regulator: gpio-regulator@0 {
@@ -146,7 +146,7 @@
 		qcom,sensor-position = <0>;
 		qcom,sensor-mode = <0>;
 		qcom,cci-master = <0>;
-		status = "ok";
+		status = "disabled";
 		clocks = <&clock_mmss clk_mclk0_clk_src>,
 				<&clock_mmss clk_mmss_camss_mclk0_clk>;
 		clock-names = "cam_src_clk", "cam_clk";
@@ -183,7 +183,7 @@
 		qcom,sensor-position = <0>;
 		qcom,sensor-mode = <0>;
 		qcom,cci-master = <1>;
-		status = "ok";
+		status = "disabled";
 		clocks = <&clock_mmss clk_mclk2_clk_src>,
 			<&clock_mmss clk_mmss_camss_mclk2_clk>;
 		clock-names = "cam_src_clk", "cam_clk";
@@ -222,7 +222,7 @@
 		qcom,sensor-position = <1>;
 		qcom,sensor-mode = <0>;
 		qcom,cci-master = <1>;
-		status = "ok";
+		status = "disabled";
 		clocks = <&clock_mmss clk_mclk1_clk_src>,
 			<&clock_mmss clk_mmss_camss_mclk1_clk>;
 		clock-names = "cam_src_clk", "cam_clk";
@@ -269,7 +269,7 @@
 		qcom,sensor-position = <0>;
 		qcom,sensor-mode = <0>;
 		qcom,cci-master = <0>;
-		status = "ok";
+		status = "disabled";
 		clocks = <&clock_mmss clk_mclk0_clk_src>,
 				<&clock_mmss clk_mmss_camss_mclk0_clk>;
 		clock-names = "cam_src_clk", "cam_clk";
@@ -312,7 +312,7 @@
 		qcom,sensor-position = <0>;
 		qcom,sensor-mode = <0>;
 		qcom,cci-master = <1>;
-		status = "ok";
+		status = "disabled";
 		clocks = <&clock_mmss clk_mclk2_clk_src>,
 			<&clock_mmss clk_mmss_camss_mclk2_clk>;
 		clock-names = "cam_src_clk", "cam_clk";
@@ -361,7 +361,7 @@
 		qcom,sensor-position = <1>;
 		qcom,sensor-mode = <0>;
 		qcom,cci-master = <1>;
-		status = "ok";
+		status = "disabled";
 		clocks = <&clock_mmss clk_mclk1_clk_src>,
 			<&clock_mmss clk_mmss_camss_mclk1_clk>;
 		clock-names = "cam_src_clk", "cam_clk";
@@ -415,7 +415,7 @@
 		qcom,src-sel = <0>;		/* GPIO */
 		qcom,invert = <0>;		/* Invert */
 		qcom,master-en = <1>;		/* Enable GPIO */
-		status = "ok";
+		status = "disabled";
 	};
 
 	gpio@d300 { /* GPIO 20 - CAMERA SENSOR 0 VDIG */
@@ -423,8 +423,7 @@
 		qcom,pull = <5>;		/* No Pull */
 		qcom,vin-sel = <1>;		/* VIN1 GPIO_MV */
 		qcom,src-sel = <0>;		/* GPIO */
-		qcom,invert = <0>;		/* Invert */
 		qcom,master-en = <1>;		/* Enable GPIO */
-		status = "ok";
+		status = "disabled";
 	};
 };

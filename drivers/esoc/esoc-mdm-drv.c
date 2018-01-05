@@ -52,7 +52,7 @@ static int esoc_msm_restart_handler(struct notifier_block *nb,
 	if (action == SYS_RESTART) {
 		if (mdm_dbg_stall_notify(ESOC_PRIMARY_REBOOT))
 			return NOTIFY_OK;
-		dev_dbg(&esoc_clink->dev, "Notifying esoc of cold reboot\n");
+		dev_info(&esoc_clink->dev, "Notifying esoc of cold reboot\n");
 		clink_ops->notify(ESOC_PRIMARY_REBOOT, esoc_clink);
 	}
 	return NOTIFY_OK;
@@ -172,7 +172,7 @@ static int mdm_subsys_powerup(const struct subsys_desc *crashed_subsys)
 	int timeout = INT_MAX;
 
 	if (!esoc_clink->auto_boot && !esoc_req_eng_enabled(esoc_clink)) {
-		dev_dbg(&esoc_clink->dev, "Wait for req eng registration\n");
+		dev_info(&esoc_clink->dev, "Wait for req eng registration\n");
 		wait_for_completion(&mdm_drv->req_eng_wait);
 	}
 	if (mdm_drv->mode == PWR_OFF) {
@@ -283,7 +283,7 @@ int esoc_ssr_probe(struct esoc_clink *esoc_clink, struct esoc_drv *drv)
 		debug_init_done = false;
 		dev_err(&esoc_clink->dev, "dbg engine failure\n");
 	} else {
-		dev_dbg(&esoc_clink->dev, "dbg engine initialized\n");
+		dev_info(&esoc_clink->dev, "dbg engine initialized\n");
 		debug_init_done = true;
 	}
 	return 0;

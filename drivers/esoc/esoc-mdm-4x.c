@@ -58,27 +58,27 @@ static void mdm_debug_gpio_show(struct mdm_ctrl *mdm)
 {
 	struct device *dev = mdm->dev;
 
-	dev_dbg(dev, "%s: MDM2AP_ERRFATAL gpio = %d\n",
+	dev_info(dev, "%s: MDM2AP_ERRFATAL gpio = %d\n",
 			__func__, MDM_GPIO(mdm, MDM2AP_ERRFATAL));
-	dev_dbg(dev, "%s: AP2MDM_ERRFATAL gpio = %d\n",
+	dev_info(dev, "%s: AP2MDM_ERRFATAL gpio = %d\n",
 			__func__, MDM_GPIO(mdm, AP2MDM_ERRFATAL));
-	dev_dbg(dev, "%s: MDM2AP_STATUS gpio = %d\n",
+	dev_info(dev, "%s: MDM2AP_STATUS gpio = %d\n",
 			__func__, MDM_GPIO(mdm, MDM2AP_STATUS));
-	dev_dbg(dev, "%s: AP2MDM_STATUS gpio = %d\n",
+	dev_info(dev, "%s: AP2MDM_STATUS gpio = %d\n",
 			__func__, MDM_GPIO(mdm, AP2MDM_STATUS));
-	dev_dbg(dev, "%s: AP2MDM_SOFT_RESET gpio = %d\n",
+	dev_info(dev, "%s: AP2MDM_SOFT_RESET gpio = %d\n",
 			__func__, MDM_GPIO(mdm, AP2MDM_SOFT_RESET));
-	dev_dbg(dev, "%s: MDM2AP_WAKEUP gpio = %d\n",
+	dev_info(dev, "%s: MDM2AP_WAKEUP gpio = %d\n",
 			__func__, MDM_GPIO(mdm, MDM2AP_WAKEUP));
-	dev_dbg(dev, "%s: AP2MDM_WAKEUP gpio = %d\n",
+	dev_info(dev, "%s: AP2MDM_WAKEUP gpio = %d\n",
 			 __func__, MDM_GPIO(mdm, AP2MDM_WAKEUP));
-	dev_dbg(dev, "%s: AP2MDM_PMIC_PWR_EN gpio = %d\n",
+	dev_info(dev, "%s: AP2MDM_PMIC_PWR_EN gpio = %d\n",
 			 __func__, MDM_GPIO(mdm, AP2MDM_PMIC_PWR_EN));
-	dev_dbg(dev, "%s: MDM2AP_PBLRDY gpio = %d\n",
+	dev_info(dev, "%s: MDM2AP_PBLRDY gpio = %d\n",
 			 __func__, MDM_GPIO(mdm, MDM2AP_PBLRDY));
-	dev_dbg(dev, "%s: AP2MDM_VDDMIN gpio = %d\n",
+	dev_info(dev, "%s: AP2MDM_VDDMIN gpio = %d\n",
 			 __func__, MDM_GPIO(mdm, AP2MDM_VDDMIN));
-	dev_dbg(dev, "%s: MDM2AP_VDDMIN gpio = %d\n",
+	dev_info(dev, "%s: MDM2AP_VDDMIN gpio = %d\n",
 			 __func__, MDM_GPIO(mdm, MDM2AP_VDDMIN));
 }
 
@@ -218,20 +218,20 @@ static int mdm_cmd_exe(enum esoc_cmd cmd, struct esoc_clink *esoc)
 		} else {
 			esoc_clink_queue_request(ESOC_REQ_SEND_SHUTDOWN, esoc);
 		}
-		dev_dbg(mdm->dev, "Waiting for status gpio go low\n");
+		dev_info(mdm->dev, "Waiting for status gpio go low\n");
 		status_down = false;
 		end_time = jiffies + msecs_to_jiffies(10000);
 		while (time_before(jiffies, end_time)) {
 			if (gpio_get_value(MDM_GPIO(mdm, MDM2AP_STATUS))
 									== 0) {
-				dev_dbg(dev, "Status went low\n");
+				dev_info(dev, "Status went low\n");
 				status_down = true;
 				break;
 			}
 			msleep(100);
 		}
 		if (status_down)
-			dev_dbg(dev, "shutdown successful\n");
+			dev_info(dev, "shutdown successful\n");
 		else
 			dev_err(mdm->dev, "graceful poff ipc fail\n");
 force_poff:
@@ -274,7 +274,7 @@ force_poff:
 		cancel_delayed_work(&mdm->mdm2ap_status_check_work);
 		if (!mdm->esoc->auto_boot) {
 			gpio_set_value(MDM_GPIO(mdm, AP2MDM_ERRFATAL), 1);
-			dev_dbg(mdm->dev,
+			dev_info(mdm->dev,
 				"set ap2mdm errfatal to force reset\n");
 			msleep(mdm->ramdump_delay_ms);
 		}
@@ -294,7 +294,7 @@ force_poff:
 			mdm->debug = 0;
 			return -EIO;
 		}
-		dev_dbg(mdm->dev, "ramdump collection done\n");
+		dev_info(mdm->dev, "ramdump collection done\n");
 		mdm->debug = 0;
 		init_completion(&mdm->debug_done);
 		break;
@@ -304,7 +304,7 @@ force_poff:
 		 * Power on the mdm
 		 */
 		gpio_set_value(MDM_GPIO(mdm, AP2MDM_ERRFATAL), 0);
-		dev_dbg(mdm->dev, "exiting debug state after power on\n");
+		dev_info(mdm->dev, "exiting debug state after power on\n");
 		mdm->get_restart_reason = true;
 	      break;
 	default:
@@ -321,7 +321,7 @@ static void mdm2ap_status_check(struct work_struct *work)
 	struct device *dev = mdm->dev;
 	struct esoc_clink *esoc = mdm->esoc;
 	if (gpio_get_value(MDM_GPIO(mdm, MDM2AP_STATUS)) == 0) {
-		dev_dbg(dev, "MDM2AP_STATUS did not go high\n");
+		dev_info(dev, "MDM2AP_STATUS did not go high\n");
 		esoc_clink_evt_notify(ESOC_UNEXPECTED_RESET, esoc);
 	}
 }
@@ -333,7 +333,7 @@ static void mdm_status_fn(struct work_struct *work)
 	struct device *dev = mdm->dev;
 	int value = gpio_get_value(MDM_GPIO(mdm, MDM2AP_STATUS));
 
-	dev_dbg(dev, "%s: status:%d\n", __func__, value);
+	dev_info(dev, "%s: status:%d\n", __func__, value);
 	/* Update gpio configuration to "running" config. */
 	mdm_update_gpio_configs(mdm, GPIO_UPDATE_RUNNING_CONFIG);
 }
@@ -356,7 +356,7 @@ static void mdm_get_restart_reason(struct work_struct *work)
 		msleep(SFR_RETRY_INTERVAL);
 	} while (++ntries < SFR_MAX_RETRIES);
 	if (ntries == SFR_MAX_RETRIES)
-		dev_dbg(dev, "%s: Error retrieving restart reason: %d\n",
+		dev_info(dev, "%s: Error retrieving restart reason: %d\n",
 						__func__, ret);
 	mdm->get_restart_reason = false;
 }
@@ -402,7 +402,7 @@ static void mdm_notify(enum esoc_notify notify, struct esoc_clink *esoc)
 	case ESOC_PRIMARY_CRASH:
 		mdm_disable_irqs(mdm);
 		status_down = false;
-		dev_dbg(dev, "signal apq err fatal for graceful restart\n");
+		dev_info(dev, "signal apq err fatal for graceful restart\n");
 		gpio_set_value(MDM_GPIO(mdm, AP2MDM_ERRFATAL), 1);
 		if (esoc->primary)
 			break;
@@ -491,7 +491,7 @@ static irqreturn_t mdm_status_change(int irq, void *dev_id)
 			return IRQ_HANDLED;
 
 		cancel_delayed_work(&mdm->mdm2ap_status_check_work);
-		dev_dbg(dev, "status = 1: mdm is now ready\n");
+		dev_info(dev, "status = 1: mdm is now ready\n");
 		mdm->ready = true;
 		mdm_trigger_dbg(mdm);
 		queue_work(mdm->mdm_queue, &mdm->mdm_status_work);
@@ -514,7 +514,7 @@ static irqreturn_t mdm_pblrdy_change(int irq, void *dev_id)
 		return IRQ_HANDLED;
 	esoc = mdm->esoc;
 	dev = mdm->dev;
-	dev_dbg(dev, "pbl ready %d:\n",
+	dev_info(dev, "pbl ready %d:\n",
 			gpio_get_value(MDM_GPIO(mdm, MDM2AP_PBLRDY)));
 	if (mdm->init) {
 		mdm->init = 0;
@@ -576,7 +576,7 @@ static void mdm_configure_debug(struct mdm_ctrl *mdm)
 		}
 		mdm->trig_cnt = 0;
 	} else {
-		dev_dbg(mdm->dev, "Not in debug mode. debug mode = %u\n", val);
+		dev_info(mdm->dev, "Not in debug mode. debug mode = %u\n", val);
 		mdm->dbg_mode = false;
 	}
 	return;
@@ -825,7 +825,7 @@ static int mdm9x25_setup_hw(struct mdm_ctrl *mdm,
 	ret = mdm_pon_dt_init(mdm);
 	if (ret)
 		return ret;
-	dev_dbg(mdm->dev, "pon dt init done\n");
+	dev_info(mdm->dev, "pon dt init done\n");
 	ret = mdm_pinctrl_init(mdm);
 	if (ret)
 		return ret;
@@ -833,7 +833,7 @@ static int mdm9x25_setup_hw(struct mdm_ctrl *mdm,
 	ret = mdm_pon_setup(mdm);
 	if (ret)
 		return ret;
-	dev_dbg(mdm->dev, "pon setup done\n");
+	dev_info(mdm->dev, "pon setup done\n");
 	ret = mdm_configure_ipc(mdm, pdev);
 	if (ret)
 		return ret;
@@ -851,7 +851,7 @@ static int mdm9x25_setup_hw(struct mdm_ctrl *mdm,
 		dev_err(mdm->dev, "esoc registration failed\n");
 		return ret;
 	}
-	dev_dbg(mdm->dev, "esoc registration done\n");
+	dev_info(mdm->dev, "esoc registration done\n");
 	init_completion(&mdm->debug_done);
 	INIT_WORK(&mdm->mdm_status_work, mdm_status_fn);
 	INIT_WORK(&mdm->restart_reason_work, mdm_get_restart_reason);
@@ -892,24 +892,24 @@ static int mdm9x35_setup_hw(struct mdm_ctrl *mdm,
 	ret = mdm_dt_parse_gpios(mdm);
 	if (ret)
 		return ret;
-	dev_dbg(mdm->dev, "parsing gpio done\n");
+	dev_info(mdm->dev, "parsing gpio done\n");
 	ret = mdm_pon_dt_init(mdm);
 	if (ret)
 		return ret;
-	dev_dbg(mdm->dev, "pon dt init done\n");
+	dev_info(mdm->dev, "pon dt init done\n");
 	ret = mdm_pinctrl_init(mdm);
 	if (ret)
 		return ret;
-	dev_dbg(mdm->dev, "pinctrl init done\n");
+	dev_info(mdm->dev, "pinctrl init done\n");
 	ret = mdm_pon_setup(mdm);
 	if (ret)
 		return ret;
-	dev_dbg(mdm->dev, "pon setup done\n");
+	dev_info(mdm->dev, "pon setup done\n");
 	ret = mdm_configure_ipc(mdm, pdev);
 	if (ret)
 		return ret;
 	mdm_configure_debug(mdm);
-	dev_dbg(mdm->dev, "ipc configure done\n");
+	dev_info(mdm->dev, "ipc configure done\n");
 	esoc->name = MDM9x35_LABEL;
 	mdm->dual_interface = of_property_read_bool(node,
 						"qcom,mdm-dual-link");
@@ -940,7 +940,7 @@ static int mdm9x35_setup_hw(struct mdm_ctrl *mdm,
 		dev_err(mdm->dev, "esoc registration failed\n");
 		return ret;
 	}
-	dev_dbg(mdm->dev, "esoc registration done\n");
+	dev_info(mdm->dev, "esoc registration done\n");
 	init_completion(&mdm->debug_done);
 	INIT_WORK(&mdm->mdm_status_work, mdm_status_fn);
 	INIT_WORK(&mdm->restart_reason_work, mdm_get_restart_reason);
@@ -983,7 +983,7 @@ static int mdm9x45_setup_hw(struct mdm_ctrl *mdm,
 	ret = mdm_pon_dt_init(mdm);
 	if (ret)
 		return ret;
-	dev_dbg(mdm->dev, "pon dt init done\n");
+	dev_info(mdm->dev, "pon dt init done\n");
 	ret = mdm_pinctrl_init(mdm);
 	if (ret)
 		return ret;
@@ -991,7 +991,7 @@ static int mdm9x45_setup_hw(struct mdm_ctrl *mdm,
 	ret = mdm_pon_setup(mdm);
 	if (ret)
 		return ret;
-	dev_dbg(mdm->dev, "pon setup done\n");
+	dev_info(mdm->dev, "pon setup done\n");
 	ret = mdm_configure_ipc(mdm, pdev);
 	if (ret)
 		return ret;
@@ -1016,7 +1016,7 @@ static int mdm9x45_setup_hw(struct mdm_ctrl *mdm,
 		dev_err(mdm->dev, "esoc registration failed\n");
 		return ret;
 	}
-	dev_dbg(mdm->dev, "esoc registration done\n");
+	dev_info(mdm->dev, "esoc registration done\n");
 	init_completion(&mdm->debug_done);
 	INIT_WORK(&mdm->mdm_status_work, mdm_status_fn);
 	INIT_WORK(&mdm->restart_reason_work, mdm_get_restart_reason);
@@ -1059,23 +1059,23 @@ static int mdm9x55_setup_hw(struct mdm_ctrl *mdm,
 	ret = mdm_dt_parse_gpios(mdm);
 	if (ret)
 		return ret;
-	dev_dbg(mdm->dev, "parsing gpio done\n");
+	dev_info(mdm->dev, "parsing gpio done\n");
 	ret = mdm_pon_dt_init(mdm);
 	if (ret)
 		return ret;
-	dev_dbg(mdm->dev, "pon dt init done\n");
+	dev_info(mdm->dev, "pon dt init done\n");
 	ret = mdm_pinctrl_init(mdm);
 	if (ret)
 		return ret;
-	dev_dbg(mdm->dev, "pinctrl init done\n");
+	dev_info(mdm->dev, "pinctrl init done\n");
 	ret = mdm_pon_setup(mdm);
 	if (ret)
 		return ret;
-	dev_dbg(mdm->dev, "pon setup done\n");
+	dev_info(mdm->dev, "pon setup done\n");
 	ret = mdm_configure_ipc(mdm, pdev);
 	if (ret)
 		return ret;
-	dev_dbg(mdm->dev, "ipc configure done\n");
+	dev_info(mdm->dev, "ipc configure done\n");
 	esoc->name = MDM9x55_LABEL;
 	mdm->dual_interface = of_property_read_bool(node,
 						"qcom,mdm-dual-link");
@@ -1094,7 +1094,7 @@ static int mdm9x55_setup_hw(struct mdm_ctrl *mdm,
 		dev_err(mdm->dev, "esoc registration failed\n");
 		return ret;
 	}
-	dev_dbg(mdm->dev, "esoc registration done\n");
+	dev_info(mdm->dev, "esoc registration done\n");
 	init_completion(&mdm->debug_done);
 	INIT_WORK(&mdm->mdm_status_work, mdm_status_fn);
 	INIT_WORK(&mdm->restart_reason_work, mdm_get_restart_reason);
@@ -1135,23 +1135,23 @@ static int apq8096_setup_hw(struct mdm_ctrl *mdm,
 	ret = mdm_dt_parse_gpios(mdm);
 	if (ret)
 		return ret;
-	dev_dbg(mdm->dev, "parsing gpio done\n");
+	dev_info(mdm->dev, "parsing gpio done\n");
 	ret = mdm_pon_dt_init(mdm);
 	if (ret)
 		return ret;
-	dev_dbg(mdm->dev, "pon dt init done\n");
+	dev_info(mdm->dev, "pon dt init done\n");
 	ret = mdm_pinctrl_init(mdm);
 	if (ret)
 		return ret;
-	dev_dbg(mdm->dev, "pinctrl init done\n");
+	dev_info(mdm->dev, "pinctrl init done\n");
 	ret = mdm_pon_setup(mdm);
 	if (ret)
 		return ret;
-	dev_dbg(mdm->dev, "pon setup done\n");
+	dev_info(mdm->dev, "pon setup done\n");
 	ret = mdm_configure_ipc(mdm, pdev);
 	if (ret)
 		return ret;
-	dev_dbg(mdm->dev, "ipc configure done\n");
+	dev_info(mdm->dev, "ipc configure done\n");
 	esoc->name = APQ8096_LABEL;
 	esoc->link_name = APQ8096_PCIE;
 	esoc->clink_ops = clink_ops;
@@ -1168,7 +1168,7 @@ static int apq8096_setup_hw(struct mdm_ctrl *mdm,
 		dev_err(mdm->dev, "esoc registration failed\n");
 		return ret;
 	}
-	dev_dbg(mdm->dev, "esoc registration done\n");
+	dev_info(mdm->dev, "esoc registration done\n");
 	init_completion(&mdm->debug_done);
 	INIT_WORK(&mdm->mdm_status_work, mdm_status_fn);
 	INIT_WORK(&mdm->restart_reason_work, mdm_get_restart_reason);
@@ -1211,23 +1211,23 @@ static int sdx50m_setup_hw(struct mdm_ctrl *mdm,
 	ret = mdm_dt_parse_gpios(mdm);
 	if (ret)
 		return ret;
-	dev_dbg(mdm->dev, "parsing gpio done\n");
+	dev_info(mdm->dev, "parsing gpio done\n");
 	ret = mdm_pon_dt_init(mdm);
 	if (ret)
 		return ret;
-	dev_dbg(mdm->dev, "pon dt init done\n");
+	dev_info(mdm->dev, "pon dt init done\n");
 	ret = mdm_pinctrl_init(mdm);
 	if (ret)
 		return ret;
-	dev_dbg(mdm->dev, "pinctrl init done\n");
+	dev_info(mdm->dev, "pinctrl init done\n");
 	ret = mdm_pon_setup(mdm);
 	if (ret)
 		return ret;
-	dev_dbg(mdm->dev, "pon setup done\n");
+	dev_info(mdm->dev, "pon setup done\n");
 	ret = mdm_configure_ipc(mdm, pdev);
 	if (ret)
 		return ret;
-	dev_dbg(mdm->dev, "ipc configure done\n");
+	dev_info(mdm->dev, "ipc configure done\n");
 	esoc->name = SDX50M_LABEL;
 	mdm->dual_interface = of_property_read_bool(node,
 						"qcom,mdm-dual-link");
@@ -1246,7 +1246,7 @@ static int sdx50m_setup_hw(struct mdm_ctrl *mdm,
 		dev_err(mdm->dev, "esoc registration failed\n");
 		return ret;
 	}
-	dev_dbg(mdm->dev, "esoc registration done\n");
+	dev_info(mdm->dev, "esoc registration done\n");
 	init_completion(&mdm->debug_done);
 	INIT_WORK(&mdm->mdm_status_work, mdm_status_fn);
 	INIT_WORK(&mdm->restart_reason_work, mdm_get_restart_reason);

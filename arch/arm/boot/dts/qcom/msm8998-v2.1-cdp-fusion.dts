@@ -1,0 +1,100 @@
+/* Copyright (c) 2016-2017, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
+
+/dts-v1/;
+
+#include "msm8998-v2.1.dtsi"
+#include "msm8998-mdss-panels.dtsi"
+#include "msm8998-cdp.dtsi"
+#include "external-soc.dtsi"
+
+/ {
+	model = "Qualcomm Technologies, Inc. MSM 8998 v2.1 + SDX50M FUSION CDP";
+	compatible = "qcom,msm8998-cdp", "qcom,msm8998", "qcom,cdp";
+	qcom,board-id = <1 2>;
+};
+
+&mdm3 {
+	pinctrl-names = "mdm_active", "mdm_suspend";
+	pinctrl-0 = <&ap2mdm_active &mdm2ap_active>;
+	pinctrl-1 = <&ap2mdm_sleep &mdm2ap_sleep>;
+	interrupt-map = <0 &tlmm 33 0x3
+			1 &tlmm 129 0x3>;
+	qcom,mdm2ap-errfatal-gpio = <&tlmm 33 0x00>;
+	qcom,ap2mdm-errfatal-gpio = <&tlmm 133 0x00>;
+	qcom,mdm2ap-status-gpio   = <&tlmm 32 0x00>;
+	qcom,ap2mdm-status-gpio   = <&tlmm 129 0x00>;
+	qcom,ap2mdm-soft-reset-gpio = <&pm8998_gpios 20 0>;
+	qcom,mdm-link-info = "0305_00.01.00";
+	status = "ok";
+};
+
+&pm8998_gpios {
+	gpio@d300 {
+		/* MDM PON conrol*/
+		qcom,mode = <1>;	/* Digital output */
+		qcom,output-type = <0>;	/* CMOS logic */
+		qcom,vin-sel = <1>;	/* S3 1.8V */
+		qcom,src-sel = <0>;	/* Constant */
+		qcom,master-en = <1>;	/* Enable GPIO */
+		status = "okay";
+	};
+};
+
+&mdss_hdmi_tx {
+	status = "disabled";
+};
+
+&pcie0_wake_default {
+	config {
+	       /delete-property/ bias-pull-down;
+	};
+};
+
+&soc {
+	qcom,ipc_router_external_mdm_xprt {
+		compatible = "qcom,ipc_router_mhi_xprt";
+		qcom,mhi = <&mhi_0>;
+		qcom,out-chan-id = <20>;
+		qcom,in-chan-id = <21>;
+		qcom,xprt-remote = "external-mdm";
+		qcom,xprt-linkid = <1>;
+		qcom,xprt-version = <3>;
+	};
+
+	diag_mhi: qcom,diag {
+		compatible = "qcom,diag-mhi";
+		qcom,mhi = <&mhi_0>;
+	};
+};
+
+&mdss_dsi0 {
+	qcom,dsi-pref-prim-pan = <&dsi_dual_nt35597_truly_video>;
+};
+
+&mdss_dsi1 {
+	qcom,dsi-pref-prim-pan = <&dsi_dual_nt35597_truly_video>;
+};
+
+&pmi8998_wled {
+	status = "okay";
+	qcom,led-strings-list = [01 02];
+};
+
+&mdss_hdmi_pll {
+	status = "disabled";
+};
+
+&wil6210 {
+	status = "disabled";
+};

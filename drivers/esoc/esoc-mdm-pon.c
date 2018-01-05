@@ -114,7 +114,7 @@ static int mdm4x_do_first_power_on(struct mdm_ctrl *mdm)
 	int pblrdy;
 	struct device *dev = mdm->dev;
 
-	dev_dbg(dev, "Powering on modem for the first time\n");
+	dev_info(dev, "Powering on modem for the first time\n");
 	if (mdm->esoc->auto_boot)
 		return 0;
 
@@ -129,7 +129,7 @@ static int mdm4x_do_first_power_on(struct mdm_ctrl *mdm)
 				break;
 			usleep_range(5000, 6000);
 		}
-		dev_dbg(dev, "pblrdy i:%d\n", i);
+		dev_info(dev, "pblrdy i:%d\n", i);
 		msleep(200);
 	}
 	/*
@@ -149,7 +149,7 @@ static int mdm4x_power_down(struct mdm_ctrl *mdm)
 	/* Assert the soft reset line whether mdm2ap_status went low or not */
 	gpio_direction_output(MDM_GPIO(mdm, AP2MDM_SOFT_RESET),
 					soft_reset_direction);
-	dev_dbg(dev, "Doing a hard reset\n");
+	dev_info(dev, "Doing a hard reset\n");
 	gpio_direction_output(MDM_GPIO(mdm, AP2MDM_SOFT_RESET),
 						soft_reset_direction);
 	/*
@@ -169,7 +169,7 @@ static int mdm9x55_power_down(struct mdm_ctrl *mdm)
 	/* Assert the soft reset line whether mdm2ap_status went low or not */
 	gpio_direction_output(MDM_GPIO(mdm, AP2MDM_SOFT_RESET),
 					soft_reset_direction);
-	dev_dbg(dev, "Doing a hard reset\n");
+	dev_info(dev, "Doing a hard reset\n");
 	gpio_direction_output(MDM_GPIO(mdm, AP2MDM_SOFT_RESET),
 						soft_reset_direction);
 	/*
@@ -209,7 +209,7 @@ static int sdx50m_power_down(struct mdm_ctrl *mdm)
 	/* Assert the soft reset line whether mdm2ap_status went low or not */
 	gpio_direction_output(MDM_GPIO(mdm, AP2MDM_SOFT_RESET),
 					soft_reset_direction);
-	dev_dbg(dev, "Doing a hard reset\n");
+	dev_info(dev, "Doing a hard reset\n");
 	gpio_direction_output(MDM_GPIO(mdm, AP2MDM_SOFT_RESET),
 						soft_reset_direction);
 	/*
@@ -227,7 +227,7 @@ static void mdm4x_cold_reset(struct mdm_ctrl *mdm)
 	if (!gpio_is_valid(MDM_GPIO(mdm, AP2MDM_SOFT_RESET)))
 		return;
 
-	dev_dbg(mdm->dev, "Triggering mdm cold reset");
+	dev_info(mdm->dev, "Triggering mdm cold reset");
 	gpio_direction_output(MDM_GPIO(mdm, AP2MDM_SOFT_RESET),
 			!!mdm->soft_reset_inverted);
 	msleep(300);
@@ -237,7 +237,7 @@ static void mdm4x_cold_reset(struct mdm_ctrl *mdm)
 
 static void mdm9x55_cold_reset(struct mdm_ctrl *mdm)
 {
-	dev_dbg(mdm->dev, "Triggering mdm cold reset");
+	dev_info(mdm->dev, "Triggering mdm cold reset");
 	gpio_direction_output(MDM_GPIO(mdm, AP2MDM_SOFT_RESET),
 			!!mdm->soft_reset_inverted);
 	mdelay(334);
@@ -247,7 +247,7 @@ static void mdm9x55_cold_reset(struct mdm_ctrl *mdm)
 
 static void sdx50m_cold_reset(struct mdm_ctrl *mdm)
 {
-	dev_dbg(mdm->dev, "Triggering mdm cold reset");
+	dev_info(mdm->dev, "Triggering mdm cold reset");
 	gpio_direction_output(MDM_GPIO(mdm, AP2MDM_SOFT_RESET),
 			!!mdm->soft_reset_inverted);
 	mdelay(334);

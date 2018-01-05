@@ -12,7 +12,7 @@
 
 &soc {
 	mdm3: qcom,mdm3 {
-		compatible = "qcom,ext-mdm9x55";
+		compatible = "qcom,ext-sdx50m";
 		cell-index = <0>;
 		#address-cells = <0>;
 		interrupt-parent = <&mdm3>;

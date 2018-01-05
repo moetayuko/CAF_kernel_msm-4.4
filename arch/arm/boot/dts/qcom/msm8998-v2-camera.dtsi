@@ -44,7 +44,7 @@
 			"camss_ispif_ahb_clk", "csiphy_clk_src", "csiphy_clk";
 		qcom,clock-rates = <0 0 0 0 0 0 274290000 0 0 200000000 0
 			0 274290000 0>;
-		status = "ok";
+		status = "disabled";
 	};
 
 	qcom,csiphy@ca35000 {
@@ -79,7 +79,7 @@
 			"camss_ispif_ahb_clk", "csiphy_clk_src", "csiphy_clk";
 		qcom,clock-rates = <0 0 0 0 0 0 274290000 0 0 200000000 0
 			0 274290000 0>;
-		status = "ok";
+		status = "disabled";
 	};
 
 	qcom,csiphy@ca36000 {
@@ -114,7 +114,7 @@
 			"camss_ispif_ahb_clk", "csiphy_clk_src", "csiphy_clk";
 		qcom,clock-rates = <0 0 0 0 0 0 274290000 0 0 200000000 0
 			0 274290000 0>;
-		status = "ok";
+		status = "disabled";
 	};
 
 	qcom,cpp@ca04000 {
@@ -156,7 +156,7 @@
 			<0x24 0x10000000>,
 			<0x28 0x10000000>,
 			<0x2C 0x10000000>;
-		status = "ok";
+		status = "disabled";
 		qcom,msm-bus,name = "msm_camera_cpp";
 		qcom,msm-bus,num-cases = <2>;
 		qcom,msm-bus,num-paths = <1>;

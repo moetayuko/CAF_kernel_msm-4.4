@@ -2725,6 +2725,7 @@
 		iommus = <&anoc1_smmu>;
 		qcom,smmu-exist;
 		qcom,smmu-sid-base = <0x1480>;
+		dma-coherent;
 
 		qcom,msm-bus,name = "pcie0";
 		qcom,msm-bus,num-cases = <2>;
