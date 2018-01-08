@@ -20,6 +20,12 @@ struct qdss_buf_tbl_lst {
 	atomic_t available;
 };
 
+struct qdss_buf_tbl_lst_t {
+	struct list_head link;
+	unsigned char *buf;
+	int len;
+};
+
 struct qdss_bridge_drvdata {
 	struct device *dev;
 	bool opened;
@@ -32,6 +38,7 @@ struct qdss_bridge_drvdata {
 	struct mhi_client_info_t *client_info;
 	struct list_head buf_tbl;
 	struct usb_qdss_ch *usb_ch;
+	struct list_head read_done_list;
 };
 
 #endif
