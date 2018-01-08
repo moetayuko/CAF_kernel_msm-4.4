@@ -1137,6 +1137,7 @@ static int cnss_pci_register_mhi(struct cnss_pci_data *pci_priv)
 	struct mhi_device *mhi_dev = &pci_priv->mhi_dev;
 
 	mhi_dev->dev = &pci_priv->plat_priv->plat_dev->dev;
+	mhi_dev->of_node = mhi_dev->dev->of_node;
 	mhi_dev->pci_dev = pci_dev;
 
 	mhi_dev->resources[0].start = (resource_size_t)pci_priv->bar;
@@ -1305,7 +1306,7 @@ int cnss_pci_set_mhi_state(struct cnss_pci_data *pci_priv,
 
 	cnss_pr_dbg("Setting MHI state: %s(%d)\n",
 		    cnss_mhi_state_to_str(mhi_state), mhi_state);
-	ret = mhi_pm_control_device(&pci_priv->mhi_dev, mhi_dev_state);
+	ret = mhi_pm_control_device(&pci_priv->mhi_dev, mhi_dev_state, NULL);
 	if (ret) {
 		cnss_pr_err("Failed to set MHI state: %s(%d)\n",
 			    cnss_mhi_state_to_str(mhi_state), mhi_state);
@@ -1382,7 +1383,7 @@ static int cnss_pci_probe(struct pci_dev *pci_dev,
 	switch (pci_dev->device) {
 	case QCA6290_EMULATION_DEVICE_ID:
 	case QCA6290_DEVICE_ID:
-		if (!mhi_is_device_ready(&plat_priv->plat_dev->dev,
+		if (!mhi_is_device_ready(plat_priv->plat_dev->dev.of_node,
 					 MHI_NODE_NAME)) {
 			cnss_pr_err("MHI driver is not ready, defer PCI probe!\n");
 			ret = -EPROBE_DEFER;

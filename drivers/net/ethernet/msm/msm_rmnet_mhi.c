@@ -36,6 +36,7 @@
 #define WATCHDOG_TIMEOUT       (30 * HZ)
 #define RMNET_IPC_LOG_PAGES (100)
 #define IRQ_MASKED_BIT (0)
+#define LPM_MASKED_BIT (1)
 
 enum DBG_LVL {
 	MSG_VERBOSE = 0x1,
@@ -92,7 +93,6 @@ struct rmnet_mhi_private {
 	u32			      max_mru;
 	u32			      max_mtu;
 	struct napi_struct            napi;
-	gfp_t                         allocation_flags;
 	uint32_t                      tx_buffers_max;
 	uint32_t                      rx_buffers_max;
 	u32			      alloc_fail;
@@ -276,8 +276,7 @@ static void rmnet_mhi_alloc_work(struct work_struct *work)
 
 	rmnet_log(rmnet_mhi_ptr, MSG_INFO, "Entered\n");
 	do {
-		ret = rmnet_alloc_rx(rmnet_mhi_ptr,
-				     rmnet_mhi_ptr->allocation_flags);
+		ret = rmnet_alloc_rx(rmnet_mhi_ptr, GFP_KERNEL);
 		/* sleep and try again */
 		if (ret == -ENOMEM) {
 			msleep(sleep_ms);
@@ -415,13 +414,14 @@ static int rmnet_mhi_init_inbound(struct rmnet_mhi_private *rmnet_mhi_ptr)
 	int res;
 
 	rmnet_log(rmnet_mhi_ptr, MSG_INFO, "Entered\n");
-	rmnet_mhi_ptr->tx_buffers_max = mhi_get_max_desc(
+	if (rmnet_mhi_ptr->tx_client_handle)
+		rmnet_mhi_ptr->tx_buffers_max = mhi_get_max_desc(
 					rmnet_mhi_ptr->tx_client_handle);
-	rmnet_mhi_ptr->rx_buffers_max = mhi_get_max_desc(
+	if (rmnet_mhi_ptr->rx_client_handle)
+		rmnet_mhi_ptr->rx_buffers_max = mhi_get_max_desc(
 					rmnet_mhi_ptr->rx_client_handle);
 	atomic_set(&rmnet_mhi_ptr->rx_pool_len, 0);
-	res = rmnet_alloc_rx(rmnet_mhi_ptr,
-			     rmnet_mhi_ptr->allocation_flags);
+	res = rmnet_alloc_rx(rmnet_mhi_ptr, GFP_KERNEL);
 
 	rmnet_log(rmnet_mhi_ptr, MSG_INFO, "Exited with %d\n", res);
 	return res;
@@ -715,9 +715,24 @@ static int rmnet_mhi_ioctl_extended(struct net_device *dev, struct ifreq *ifr)
 		read_lock_bh(&rmnet_mhi_ptr->pm_lock);
 		if (rmnet_mhi_ptr->mhi_enabled &&
 		    rmnet_mhi_ptr->tx_client_handle != NULL) {
-			rmnet_mhi_ptr->wake_count += (ext_cmd.u.data) ? -1 : 1;
-			mhi_set_lpm(rmnet_mhi_ptr->tx_client_handle,
-				   ext_cmd.u.data);
+			if (ext_cmd.u.data && !test_and_set_bit(LPM_MASKED_BIT,
+						&rmnet_mhi_ptr->flags)) {
+				/* Request to enable LPM */
+				rmnet_log(rmnet_mhi_ptr, MSG_INFO,
+					  "Enable MHI LPM");
+				rmnet_mhi_ptr->wake_count--;
+				mhi_set_lpm(rmnet_mhi_ptr->tx_client_handle,
+					    true);
+			} else if (!ext_cmd.u.data &&
+				   test_and_clear_bit(LPM_MASKED_BIT,
+						      &rmnet_mhi_ptr->flags)) {
+				/* Request to disable LPM */
+				rmnet_log(rmnet_mhi_ptr, MSG_INFO,
+					  "Disable MHI LPM");
+				rmnet_mhi_ptr->wake_count++;
+				mhi_set_lpm(rmnet_mhi_ptr->tx_client_handle,
+					    false);
+			}
 		} else {
 			rmnet_log(rmnet_mhi_ptr, MSG_ERROR,
 				  "Cannot set LPM value, MHI is not up.\n");
@@ -904,12 +919,6 @@ static int rmnet_mhi_enable_iface(struct rmnet_mhi_private *rmnet_mhi_ptr)
 		rmnet_mhi_ctxt = netdev_priv(rmnet_mhi_ptr->dev);
 		rtnl_unlock();
 		*rmnet_mhi_ctxt = rmnet_mhi_ptr;
-
-		ret = dma_set_mask(&rmnet_mhi_ptr->dev->dev, MHI_DMA_MASK);
-		if (ret)
-			rmnet_mhi_ptr->allocation_flags = GFP_KERNEL;
-		else
-			rmnet_mhi_ptr->allocation_flags = GFP_DMA;
 
 		netif_napi_add(rmnet_mhi_ptr->dev, &rmnet_mhi_ptr->napi,
 			       rmnet_mhi_poll, MHI_NAPI_WEIGHT_VALUE);
@@ -1198,7 +1207,7 @@ static int rmnet_mhi_probe(struct platform_device *pdev)
 	if (unlikely(!pdev->dev.of_node))
 		return -ENODEV;
 
-	if (!mhi_is_device_ready(&pdev->dev, "qcom,mhi"))
+	if (!mhi_is_device_ready(pdev->dev.of_node, "qcom,mhi"))
 		return -EPROBE_DEFER;
 
 	pdev->id = of_alias_get_id(pdev->dev.of_node, "mhi_rmnet");
@@ -1261,7 +1270,7 @@ static int rmnet_mhi_probe(struct platform_device *pdev)
 		rmnet_mhi_ptr->interface_name = rmnet_mhi_driver.driver.name;
 	}
 
-	client_info.dev = &pdev->dev;
+	client_info.of_node = pdev->dev.of_node;
 	client_info.node_name = "qcom,mhi";
 	client_info.mhi_client_cb = rmnet_mhi_cb;
 	client_info.user_data = rmnet_mhi_ptr;
@@ -1319,6 +1328,9 @@ static int rmnet_mhi_probe(struct platform_device *pdev)
 		rc = -ENODEV;
 		goto probe_fail;
 	}
+
+	/* by default MHI lpm is enable, set flag */
+	set_bit(LPM_MASKED_BIT, &rmnet_mhi_ptr->flags);
 
 	snprintf(node_name,
 		 sizeof(node_name),

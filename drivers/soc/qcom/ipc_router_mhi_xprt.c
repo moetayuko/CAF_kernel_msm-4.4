@@ -774,12 +774,12 @@ static int ipc_router_mhi_driver_register(
 	const char *node_name = "qcom,mhi";
 	struct mhi_client_info_t *mhi_info;
 
-	if (!mhi_is_device_ready(dev, node_name))
+	if (!mhi_is_device_ready(dev->of_node, node_name))
 		return -EPROBE_DEFER;
 
 	mhi_info = &mhi_xprtp->ch_hndl.out_clnt_info;
 	mhi_info->chan = mhi_xprtp->ch_hndl.out_chan_id;
-	mhi_info->dev = dev;
+	mhi_info->of_node = dev->of_node;
 	mhi_info->node_name = node_name;
 	mhi_info->user_data = mhi_xprtp;
 	rc = mhi_register_channel(&mhi_xprtp->ch_hndl.out_handle, mhi_info);
@@ -791,7 +791,7 @@ static int ipc_router_mhi_driver_register(
 
 	mhi_info = &mhi_xprtp->ch_hndl.in_clnt_info;
 	mhi_info->chan = mhi_xprtp->ch_hndl.in_chan_id;
-	mhi_info->dev = dev;
+	mhi_info->of_node = dev->of_node;
 	mhi_info->node_name = node_name;
 	mhi_info->user_data = mhi_xprtp;
 	rc = mhi_register_channel(&mhi_xprtp->ch_hndl.in_handle, mhi_info);

@@ -2,14 +2,14 @@
 # msm network device configuration
 #
 
-config MSM_RMNET_MHI
-	bool "RMNET MHI Driver"
+config MHI_NETDEV
+	bool "MHI net device driver support"
 	depends on MSM_MHI
 	help
-	  Implements RMNET over MHI interface.
-	  RMNET provides a virtual ethernet interface
-	  for routing IP packets within the MSM using
-	  BAM as a physical transport.
+	  Implements IP traffic over MHI interface.
+	  MHI netdev driver provides a virtual ethernet interface
+	  for routing IP packets to external modem via
+	  PCIe interface using MHI transport protocol.
 
 config ECM_IPA
 	tristate "STD ECM LAN Driver support"
