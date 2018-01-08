@@ -84,6 +84,30 @@ static int mdm9x45_toggle_soft_reset(struct mdm_ctrl *mdm, bool atomic)
 	return 0;
 }
 
+/* This function can be called from atomic context. */
+static int sdx50m_toggle_soft_reset(struct mdm_ctrl *mdm, bool atomic)
+{
+	int soft_reset_direction_assert = 0,
+	    soft_reset_direction_de_assert = 1;
+
+	if (mdm->soft_reset_inverted) {
+		soft_reset_direction_assert = 1;
+		soft_reset_direction_de_assert = 0;
+	}
+	gpio_direction_output(MDM_GPIO(mdm, AP2MDM_SOFT_RESET),
+			soft_reset_direction_assert);
+	/*
+	 * Allow PS hold assert to be detected
+	 */
+	if (!atomic)
+		usleep_range(203000, 300000);
+	else
+		mdelay(203);
+	gpio_direction_output(MDM_GPIO(mdm, AP2MDM_SOFT_RESET),
+			soft_reset_direction_de_assert);
+	return 0;
+}
+
 static int mdm4x_do_first_power_on(struct mdm_ctrl *mdm)
 {
 	int i;
@@ -178,6 +202,26 @@ static int mdm9x45_power_down(struct mdm_ctrl *mdm)
 	return 0;
 }
 
+static int sdx50m_power_down(struct mdm_ctrl *mdm)
+{
+	struct device *dev = mdm->dev;
+	int soft_reset_direction = mdm->soft_reset_inverted ? 1 : 0;
+	/* Assert the soft reset line whether mdm2ap_status went low or not */
+	gpio_direction_output(MDM_GPIO(mdm, AP2MDM_SOFT_RESET),
+					soft_reset_direction);
+	dev_dbg(dev, "Doing a hard reset\n");
+	gpio_direction_output(MDM_GPIO(mdm, AP2MDM_SOFT_RESET),
+						soft_reset_direction);
+	/*
+	* Currently, there is a debounce timer on the charm PMIC. It is
+	* necessary to hold the PMIC RESET low for 406ms
+	* for the reset to fully take place. Sleep here to ensure the
+	* reset has occurred before the function exits.
+	*/
+	msleep(406);
+	return 0;
+}
+
 static void mdm4x_cold_reset(struct mdm_ctrl *mdm)
 {
 	if (!gpio_is_valid(MDM_GPIO(mdm, AP2MDM_SOFT_RESET)))
@@ -192,6 +236,16 @@ static void mdm4x_cold_reset(struct mdm_ctrl *mdm)
 }
 
 static void mdm9x55_cold_reset(struct mdm_ctrl *mdm)
+{
+	dev_dbg(mdm->dev, "Triggering mdm cold reset");
+	gpio_direction_output(MDM_GPIO(mdm, AP2MDM_SOFT_RESET),
+			!!mdm->soft_reset_inverted);
+	mdelay(334);
+	gpio_direction_output(MDM_GPIO(mdm, AP2MDM_SOFT_RESET),
+			!mdm->soft_reset_inverted);
+}
+
+static void sdx50m_cold_reset(struct mdm_ctrl *mdm)
 {
 	dev_dbg(mdm->dev, "Triggering mdm cold reset");
 	gpio_direction_output(MDM_GPIO(mdm, AP2MDM_SOFT_RESET),
@@ -294,5 +348,14 @@ struct mdm_pon_ops apq8096_pon_ops = {
 	.poff_force = apq8096_power_down,
 	.cold_reset = apq8096_cold_reset,
 	.dt_init = apq8096_pon_dt_init,
+	.setup = mdm4x_pon_setup,
+};
+
+struct mdm_pon_ops sdx50m_pon_ops = {
+	.pon = mdm4x_do_first_power_on,
+	.soft_reset = sdx50m_toggle_soft_reset,
+	.poff_force = sdx50m_power_down,
+	.cold_reset = sdx50m_cold_reset,
+	.dt_init = mdm4x_pon_dt_init,
 	.setup = mdm4x_pon_setup,
 };

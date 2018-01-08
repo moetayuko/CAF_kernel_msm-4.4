@@ -1182,6 +1182,82 @@ static int apq8096_setup_hw(struct mdm_ctrl *mdm,
 	return 0;
 }
 
+static int sdx50m_setup_hw(struct mdm_ctrl *mdm,
+					const struct mdm_ops *ops,
+					struct platform_device *pdev)
+{
+	int ret;
+	struct device_node *node;
+	struct esoc_clink *esoc;
+	const struct esoc_clink_ops *const clink_ops = ops->clink_ops;
+	const struct mdm_pon_ops *pon_ops = ops->pon_ops;
+
+	mdm->dev = &pdev->dev;
+	mdm->pon_ops = pon_ops;
+	node = pdev->dev.of_node;
+	esoc = devm_kzalloc(mdm->dev, sizeof(*esoc), GFP_KERNEL);
+	if (IS_ERR_OR_NULL(esoc)) {
+		dev_err(mdm->dev, "cannot allocate esoc device\n");
+		return PTR_ERR(esoc);
+	}
+	esoc->pdev = pdev;
+	mdm->mdm_queue = alloc_workqueue("mdm_queue", 0, 0);
+	if (!mdm->mdm_queue) {
+		dev_err(mdm->dev, "could not create mdm_queue\n");
+		return -ENOMEM;
+	}
+	mdm->irq_mask = 0;
+	mdm->ready = false;
+	ret = mdm_dt_parse_gpios(mdm);
+	if (ret)
+		return ret;
+	dev_dbg(mdm->dev, "parsing gpio done\n");
+	ret = mdm_pon_dt_init(mdm);
+	if (ret)
+		return ret;
+	dev_dbg(mdm->dev, "pon dt init done\n");
+	ret = mdm_pinctrl_init(mdm);
+	if (ret)
+		return ret;
+	dev_dbg(mdm->dev, "pinctrl init done\n");
+	ret = mdm_pon_setup(mdm);
+	if (ret)
+		return ret;
+	dev_dbg(mdm->dev, "pon setup done\n");
+	ret = mdm_configure_ipc(mdm, pdev);
+	if (ret)
+		return ret;
+	dev_dbg(mdm->dev, "ipc configure done\n");
+	esoc->name = SDX50M_LABEL;
+	mdm->dual_interface = of_property_read_bool(node,
+						"qcom,mdm-dual-link");
+	esoc->link_name = SDX50M_PCIE;
+	ret = of_property_read_string(node, "qcom,mdm-link-info",
+					&esoc->link_info);
+	if (ret)
+		dev_info(mdm->dev, "esoc link info missing\n");
+	esoc->clink_ops = clink_ops;
+	esoc->parent = mdm->dev;
+	esoc->owner = THIS_MODULE;
+	esoc->np = pdev->dev.of_node;
+	set_esoc_clink_data(esoc, mdm);
+	ret = esoc_clink_register(esoc);
+	if (ret) {
+		dev_err(mdm->dev, "esoc registration failed\n");
+		return ret;
+	}
+	dev_dbg(mdm->dev, "esoc registration done\n");
+	init_completion(&mdm->debug_done);
+	INIT_WORK(&mdm->mdm_status_work, mdm_status_fn);
+	INIT_WORK(&mdm->restart_reason_work, mdm_get_restart_reason);
+	INIT_DELAYED_WORK(&mdm->mdm2ap_status_check_work, mdm2ap_status_check);
+	mdm->get_restart_reason = false;
+	mdm->debug_fail = false;
+	mdm->esoc = esoc;
+	mdm->init = 0;
+	return 0;
+}
+
 static struct esoc_clink_ops mdm_cops = {
 	.cmd_exe = mdm_cmd_exe,
 	.get_status = mdm_get_status,
@@ -1219,6 +1295,12 @@ static struct mdm_ops mdm9x55_ops = {
 	.pon_ops = &mdm9x55_pon_ops,
 };
 
+static struct mdm_ops sdx50m_ops = {
+	.clink_ops = &mdm_cops,
+	.config_hw = sdx50m_setup_hw,
+	.pon_ops = &sdx50m_pon_ops,
+};
+
 static const struct of_device_id mdm_dt_match[] = {
 	{ .compatible = "qcom,ext-mdm9x25",
 		.data = &mdm9x25_ops, },
@@ -1230,6 +1312,8 @@ static const struct of_device_id mdm_dt_match[] = {
 		.data = &mdm9x55_ops, },
 	{ .compatible = "qcom,ext-apq8096",
 		.data = &apq8096_ops, },
+	{ .compatible = "qcom,ext-sdx50m",
+		.data = &sdx50m_ops, },
 	{},
 };
 MODULE_DEVICE_TABLE(of, mdm_dt_match);
