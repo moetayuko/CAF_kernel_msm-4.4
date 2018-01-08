@@ -377,9 +377,11 @@ static void mhi_open_work_fn(struct work_struct *work)
 
 static void mhi_read_done_work_fn(struct work_struct *work)
 {
+	struct diag_mhi_buf_tbl_t *tp;
 	unsigned char *buf = NULL;
-	struct mhi_result result;
+	unsigned long flags;
 	int err = 0;
+	int len;
 	struct diag_mhi_info *mhi_info = container_of(work,
 						      struct diag_mhi_info,
 						      read_done_work);
@@ -389,17 +391,26 @@ static void mhi_read_done_work_fn(struct work_struct *work)
 	do {
 		if (!(atomic_read(&(mhi_info->read_ch.opened))))
 			break;
-		err = mhi_poll_inbound(mhi_info->read_ch.hdl, &result);
-		if (err) {
-			pr_debug("diag: In %s, err %d\n", __func__, err);
+
+		spin_lock_irqsave(&mhi_info->lock, flags);
+		if (list_empty(&mhi_info->read_done_list)) {
+			spin_unlock_irqrestore(&mhi_info->lock, flags);
 			break;
 		}
-		buf = result.buf_addr;
+		tp = list_first_entry(&mhi_info->read_done_list,
+				struct diag_mhi_buf_tbl_t, link);
+		list_del(&tp->link);
+		buf = tp->buf;
+		len = tp->len;
+		kfree(tp);
+		spin_unlock_irqrestore(&mhi_info->lock, flags);
+
 		if (!buf)
 			break;
+
 		DIAG_LOG(DIAG_DEBUG_BRIDGE,
-			 "read from mhi port %d buf %pK\n",
-			 mhi_info->id, buf);
+			 "read from mhi port %d buf %pK len:%d\n",
+			 mhi_info->id, buf, len);
 		/*
 		 * The read buffers can come after the MHI channels are closed.
 		 * If the channels are closed at the time of read, discard the
@@ -407,13 +418,13 @@ static void mhi_read_done_work_fn(struct work_struct *work)
 		 */
 		if ((atomic_read(&(mhi_info->read_ch.opened)))) {
 			err = diag_remote_dev_read_done(mhi_info->dev_id, buf,
-						  result.bytes_xferd);
+							len);
 			if (err)
 				mhi_buf_tbl_remove(mhi_info, TYPE_MHI_READ_CH,
-					buf, result.bytes_xferd);
+						   buf, len);
 		} else {
 			mhi_buf_tbl_remove(mhi_info, TYPE_MHI_READ_CH, buf,
-					   result.bytes_xferd);
+					   len);
 		}
 	} while (buf);
 }
@@ -554,6 +565,7 @@ static void mhi_notifier(struct mhi_cb_info *cb_info)
 	struct diag_mhi_ch_t *ch = NULL;
 	void *buf = NULL;
 	struct diag_mhi_info *mhi_info = NULL;
+	struct diag_mhi_buf_tbl_t *tp;
 	unsigned long flags;
 
 	if (!cb_info)
@@ -571,6 +583,7 @@ static void mhi_notifier(struct mhi_cb_info *cb_info)
 				   __func__, index);
 		return;
 	}
+	mhi_info = &diag_mhi[index];
 
 	type = GET_CH_TYPE((uintptr_t)cb_info->result->user_data);
 	switch (type) {
@@ -615,6 +628,17 @@ static void mhi_notifier(struct mhi_cb_info *cb_info)
 		if (type == TYPE_MHI_READ_CH) {
 			if (!atomic_read(&(diag_mhi[index].read_ch.opened)))
 				break;
+
+			tp = kmalloc(sizeof(*tp), GFP_ATOMIC);
+			if (!tp) {
+				pr_err("diag: In %s, no mem for list\n", __func__);
+				break;
+			}
+			tp->buf = cb_info->result->buf_addr;
+			tp->len = cb_info->result->bytes_xferd;
+			spin_lock_irqsave(&mhi_info->lock, flags);
+			list_add_tail(&tp->link, &mhi_info->read_done_list);
+			spin_unlock_irqrestore(&mhi_info->lock, flags);
 
 			queue_work(diag_mhi[index].mhi_wq,
 				   &(diag_mhi[index].read_done_work));
@@ -710,6 +734,7 @@ int diag_mhi_init()
 		mhi_info = &diag_mhi[i];
 		spin_lock_init(&mhi_info->lock);
 		INIT_WORK(&(mhi_info->read_work), mhi_read_work_fn);
+		INIT_LIST_HEAD(&mhi_info->read_done_list);
 		INIT_WORK(&(mhi_info->read_done_work), mhi_read_done_work_fn);
 		INIT_WORK(&(mhi_info->open_work), mhi_open_work_fn);
 		INIT_WORK(&(mhi_info->close_work), mhi_close_work_fn);
