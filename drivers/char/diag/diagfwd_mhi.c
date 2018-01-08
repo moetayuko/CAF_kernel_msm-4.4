@@ -52,12 +52,12 @@ struct diag_mhi_info diag_mhi[NUM_MHI_DEV] = {
 		.mempool_init = 0,
 		.mhi_wq = NULL,
 		.read_ch = {
-			.chan = MHI_CLIENT_DIAG_IN,
+			.chan = "DIAG_IN",
 			.type = TYPE_MHI_READ_CH,
 			.hdl = NULL,
 		},
 		.write_ch = {
-			.chan = MHI_CLIENT_DIAG_OUT,
+			.chan = "DIAG_OUT",
 			.type = TYPE_MHI_WRITE_CH,
 			.hdl = NULL,
 		}
@@ -72,12 +72,12 @@ struct diag_mhi_info diag_mhi[NUM_MHI_DEV] = {
 		.mempool_init = 0,
 		.mhi_wq = NULL,
 		.read_ch = {
-			.chan = MHI_CLIENT_DCI_IN,
+			.chan = "DCI_IN",
 			.type = TYPE_MHI_READ_CH,
 			.hdl = NULL,
 		},
 		.write_ch = {
-			.chan = MHI_CLIENT_DCI_OUT,
+			.chan = "DCI_OUT",
 			.type = TYPE_MHI_WRITE_CH,
 			.hdl = NULL,
 		}
@@ -571,13 +571,13 @@ static void mhi_notifier(struct mhi_cb_info *cb_info)
 	if (!cb_info)
 		return;
 
-	result = cb_info->result;
+	result = &cb_info->result;
 	if (!result) {
 		pr_err_ratelimited("diag: failed to obtain mhi result from callback\n");
 		return;
 	}
 
-	index = GET_INFO_INDEX((uintptr_t)cb_info->result->user_data);
+	index = GET_INFO_INDEX((uintptr_t)cb_info->user_data);
 	if (index < 0 || index >= NUM_MHI_DEV) {
 		pr_err_ratelimited("diag: In %s, invalid MHI index %d\n",
 				   __func__, index);
@@ -585,7 +585,7 @@ static void mhi_notifier(struct mhi_cb_info *cb_info)
 	}
 	mhi_info = &diag_mhi[index];
 
-	type = GET_CH_TYPE((uintptr_t)cb_info->result->user_data);
+	type = GET_CH_TYPE((uintptr_t)cb_info->user_data);
 	switch (type) {
 	case TYPE_MHI_READ_CH:
 		ch = &diag_mhi[index].read_ch;
@@ -634,8 +634,8 @@ static void mhi_notifier(struct mhi_cb_info *cb_info)
 				pr_err("diag: In %s, no mem for list\n", __func__);
 				break;
 			}
-			tp->buf = cb_info->result->buf_addr;
-			tp->len = cb_info->result->bytes_xferd;
+			tp->buf = cb_info->result.buf_addr;
+			tp->len = cb_info->result.bytes_xferd;
 			spin_lock_irqsave(&mhi_info->lock, flags);
 			list_add_tail(&tp->link, &mhi_info->read_done_list);
 			spin_unlock_irqrestore(&mhi_info->lock, flags);
@@ -694,6 +694,7 @@ static struct diag_remote_dev_ops diag_mhi_fwd_ops = {
 static int diag_mhi_register_ch(int id, struct diag_mhi_ch_t *ch)
 {
 	int ctxt = 0;
+	int ret;
 	if (!ch)
 		return -EIO;
 	if (id < 0 || id >= NUM_MHI_DEV)
@@ -702,11 +703,13 @@ static int diag_mhi_register_ch(int id, struct diag_mhi_ch_t *ch)
 	atomic_set(&(ch->opened), 0);
 	ctxt = SET_CH_CTXT(id, ch->type);
 	ch->client_info.mhi_client_cb = mhi_notifier;
-	ch->client_info.chan = ch->chan;
+	ch->client_info.chan_name = ch->chan;
 	ch->client_info.of_node = driver->pdev->dev.of_node;
 	ch->client_info.node_name = "qcom,mhi";
 	ch->client_info.user_data = (void *)(uintptr_t)ctxt;
-	return mhi_register_channel(&ch->hdl, &ch->client_info);
+	ch->hdl = mhi_register_channel(&ch->client_info);
+	ret = IS_ERR(ch->hdl) ? PTR_ERR(ch->hdl) : 0;
+	return ret;
 }
 
 static void diag_mhi_dev_exit(int dev)

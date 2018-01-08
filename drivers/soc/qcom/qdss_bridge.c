@@ -329,13 +329,13 @@ static void mhi_notifier(struct mhi_cb_info *cb_info)
 	if (!cb_info)
 		return;
 
-	result = cb_info->result;
+	result = &cb_info->result;
 	if (!result) {
 		pr_err_ratelimited("Failed to obtain MHI result\n");
 		return;
 	}
 
-	drvdata = (struct qdss_bridge_drvdata *)cb_info->result->user_data;
+	drvdata = (struct qdss_bridge_drvdata *)cb_info->user_data;
 	if (!drvdata) {
 		pr_err_ratelimited("MHI returned invalid drvdata\n");
 		return;
@@ -356,8 +356,8 @@ static void mhi_notifier(struct mhi_cb_info *cb_info)
 			break;
 		}
 
-		entry->buf = cb_info->result->buf_addr;
-		entry->len = cb_info->result->bytes_xferd;
+		entry->buf = cb_info->result.buf_addr;
+		entry->len = cb_info->result.bytes_xferd;
 		list_add_tail(&entry->link, &drvdata->read_done_list);
 
 		queue_work(drvdata->mhi_wq, &drvdata->read_done_work);
@@ -393,12 +393,13 @@ static int qdss_mhi_register_ch(struct qdss_bridge_drvdata *drvdata)
 	drvdata->client_info = client_info;
 
 	mhi_info = client_info;
-	mhi_info->chan = MHI_CLIENT_QDSS_IN;
-	mhi_info->dev = drvdata->dev;
+	mhi_info->chan_name = "QDSS_IN";
+	mhi_info->of_node = drvdata->dev->of_node;
 	mhi_info->node_name = "qcom,mhi";
 	mhi_info->user_data = drvdata;
 
-	ret = mhi_register_channel(&drvdata->hdl, mhi_info);
+	drvdata->hdl = mhi_register_channel(mhi_info);
+	ret = IS_ERR(drvdata->hdl) ? PTR_ERR(drvdata->hdl) : 0;
 	return ret;
 }
 

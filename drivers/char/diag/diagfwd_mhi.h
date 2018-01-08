@@ -53,7 +53,7 @@ struct diag_mhi_buf_tbl_t {
 struct diag_mhi_ch_t {
 	uint8_t type;
 	u32 channel;
-	enum MHI_CLIENT_CHANNEL chan;
+	const char *chan;
 	atomic_t opened;
 	spinlock_t lock;
 	struct mhi_client_info_t client_info;
