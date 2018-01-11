@@ -149,3 +149,14 @@
 
 	status = "okay";
 };
+
+#include "vplatform-lfv-msm8996-usb.dtsi"
+
+&usb_detect {
+	qcom,force-vbus-status-on;
+};
+
+&usb3 {
+	status = "okay";
+	qcom,no-wakeup-src-in-hostmode;
+};
