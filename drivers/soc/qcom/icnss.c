@@ -485,11 +485,11 @@ static struct icnss_priv {
 	bool is_wlan_mac_set;
 	struct icnss_wlan_mac_addr wlan_mac_addr;
 	bool bypass_s1_smmu;
-	struct mutex dev_lock;
 	u8 cause_for_rejuvenation;
 	u8 requesting_sub_system;
 	u16 line_number;
 	char function_name[QMI_WLFW_FUNCTION_NAME_LEN_V01 + 1];
+        struct mutex dev_lock;
 } *penv;
 
 #ifdef CONFIG_ICNSS_DEBUG
