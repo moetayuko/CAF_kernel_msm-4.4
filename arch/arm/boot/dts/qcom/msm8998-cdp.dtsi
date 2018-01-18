@@ -10,7 +10,7 @@
  * GNU General Public License for more details.
  */
 
-#include "msm8998-camera-sensor-cdp.dtsi"
+#include "apq8098-camera-sensor-qrd.dtsi"
 &vendor {
 	bluetooth: bt_wcn3990 {
 		compatible = "qca,wcn3990";
