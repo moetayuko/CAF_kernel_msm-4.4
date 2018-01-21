@@ -692,6 +692,7 @@
 	clock_virt: qcom,virtclk-frontend@0 {
 		compatible = "qcom,virtclk-frontend-8996";
 		#clock-cells = <1>;
+		#reset-cells = <1>;
 	};
 
 	clock_gcc: qcom,gcc@300000 {
