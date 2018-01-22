@@ -230,6 +230,8 @@ void a5xx_preempt_hw_init(struct msm_gpu *gpu)
 			if (ring) {
 				a5xx_gpu->preempt[ring->id]->wptr = 0;
 				a5xx_gpu->preempt[ring->id]->rptr = 0;
+				a5xx_gpu->preempt[ring->id]->info = 0;
+				a5xx_gpu->preempt[ring->id]->data = 0;
 				a5xx_gpu->preempt[ring->id]->rbase = ring->iova;
 			}
 		}
