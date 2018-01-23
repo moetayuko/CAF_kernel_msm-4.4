@@ -38,6 +38,7 @@
 #include "diag_masks.h"
 #include "diag_usb.h"
 #include "diag_mux.h"
+#include "diag_ipc_logging.h"
 
 #define STM_CMD_VERSION_OFFSET	4
 #define STM_CMD_MASK_OFFSET	5
@@ -1547,6 +1548,9 @@ static int diagfwd_mux_write_done(unsigned char *buf, int len, int buf_ctxt,
 	switch (type) {
 	case TYPE_DATA:
 		if (peripheral >= 0 && peripheral < NUM_PERIPHERALS) {
+			DIAG_LOG(DIAG_DEBUG_PERIPHERALS,
+			"Marking buffer as free after write done p: %d, t: %d, buf_num: %d\n",
+				peripheral, type, num);
 			diagfwd_write_done(peripheral, type, num);
 			diag_ws_on_copy(DIAG_WS_MUX);
 		} else if (peripheral == APPS_DATA) {
