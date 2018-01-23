@@ -394,6 +394,19 @@ static void diagfwd_data_read_untag_done(struct diagfwd_info *fwd_info,
 			temp_buf_main += (buf_len + 4);
 			processed += buf_len;
 		}
+
+		if (flag_buf_1) {
+			fwd_info->cpd_len_1 = len_cpd;
+			temp_ptr_cpd = fwd_info->buf_1;
+			if (fwd_info->type == TYPE_DATA)
+				fwd_info->upd_len_1_a = len_upd_1;
+		} else if (flag_buf_2) {
+			fwd_info->cpd_len_2 = len_cpd;
+			temp_ptr_cpd = fwd_info->buf_2;
+			if (fwd_info->type == TYPE_DATA)
+				fwd_info->upd_len_1_b = len_upd_1;
+		}
+
 		if (fwd_info->type == TYPE_DATA && len_upd_1) {
 			if (flag_buf_1)
 				temp_ptr_upd = fwd_info->buf_upd_1_a;
@@ -407,13 +420,6 @@ static void diagfwd_data_read_untag_done(struct diagfwd_info *fwd_info,
 				temp_ptr_upd, len_upd_1);
 		}
 		if (len_cpd) {
-			if (flag_buf_1) {
-				fwd_info->cpd_len_1 = len_cpd;
-				temp_ptr_cpd = fwd_info->buf_1;
-			} else {
-				fwd_info->cpd_len_2 = len_cpd;
-				temp_ptr_cpd = fwd_info->buf_2;
-			}
 			temp_ptr_cpd->ctxt &= 0x00FFFFFF;
 			temp_ptr_cpd->ctxt |=
 				(SET_PD_CTXT(ctxt_cpd));
@@ -1164,11 +1170,26 @@ void diagfwd_write_done(uint8_t peripheral, uint8_t type, int ctxt)
 
 	fwd_info = &peripheral_info[type][peripheral];
 	if (ctxt == 1 && fwd_info->buf_1) {
-		atomic_set(&fwd_info->buf_1->in_busy, 0);
+		/* Buffer 1 for core PD is freed */
 		fwd_info->cpd_len_1 = 0;
+
+		if (peripheral == PERIPHERAL_MODEM) {
+			if (!fwd_info->upd_len_1_a)
+				atomic_set(&fwd_info->buf_1->in_busy, 0);
+		} else {
+			atomic_set(&fwd_info->buf_1->in_busy, 0);
+		}
 	} else if (ctxt == 2 && fwd_info->buf_2) {
-		atomic_set(&fwd_info->buf_2->in_busy, 0);
+		/* Buffer 2 for core PD is freed */
 		fwd_info->cpd_len_2 = 0;
+
+		if (peripheral == PERIPHERAL_MODEM) {
+			if (!fwd_info->upd_len_1_b)
+				atomic_set(&fwd_info->buf_2->in_busy, 0);
+		} else {
+			atomic_set(&fwd_info->buf_2->in_busy, 0);
+		}
+
 	} else if (ctxt == 3 && fwd_info->buf_upd_1_a) {
 		atomic_set(&fwd_info->buf_upd_1_a->in_busy, 0);
 		if (fwd_info->cpd_len_1 == 0)
