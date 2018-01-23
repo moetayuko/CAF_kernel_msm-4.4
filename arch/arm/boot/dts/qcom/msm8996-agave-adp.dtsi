@@ -611,19 +611,19 @@
 	qcom,non-pluggable;
 	qcom,customize-modes {
 		qcom,customize-mode-id@0 {
-			qcom,mode-name = "3840x2160@60Hz";
-			qcom,mode-h-active = <3840>;
-			qcom,mode-h-front-porch = <176>;
-			qcom,mode-h-pulse-width = <88>;
-			qcom,mode-h-back-porch = <296>;
+			qcom,mode-name = "1920x1080@60Hz";
+			qcom,mode-h-active = <1920>;
+			qcom,mode-h-front-porch = <88>;
+			qcom,mode-h-pulse-width = <44>;
+			qcom,mode-h-back-porch = <148>;
 			qcom,mode-h-active-high;
-			qcom,mode-v-active = <2160>;
-			qcom,mode-v-front-porch = <8>;
-			qcom,mode-v-pulse-width = <10>;
-			qcom,mode-v-back-porch = <72>;
+			qcom,mode-v-active = <1080>;
+			qcom,mode-v-front-porch = <4>;
+			qcom,mode-v-pulse-width = <5>;
+			qcom,mode-v-back-porch = <36>;
 			qcom,mode-v-active-high;
 			qcom,mode-refresh-rate = <60>;
-			qcom,mode-clock-in-khz = <594000>;
+			qcom,mode-clock-in-khz = <148500>;
 		};
 	};
 };
