@@ -191,6 +191,7 @@ struct virtual_channel *frontend_open(struct uhab_context *ctx,
 	ret = hab_open_listen(ctx, dev, &request, &recv_request, 0);
 	if (ret || !recv_request) {
 		pr_err("hab_open_listen failed: %d\n", ret);
+		ret = -EINVAL;
 		goto err;
 	}
 
@@ -245,7 +246,9 @@ struct virtual_channel *backend_listen(struct uhab_context *ctx,
 			NULL, 0, sub_id, 0);
 		ret = hab_open_listen(ctx, dev, &request, &recv_request, 0);
 		if (ret || !recv_request) {
-			pr_err("hab_open_listen failed: %d\n", ret);
+			/* device is closed */
+			pr_err("open request wait failed ctx closing %d, listen pchan %p\n",
+					  ctx->closing, request.pchan);
 			goto err;
 		}
 
@@ -276,7 +279,8 @@ struct virtual_channel *backend_listen(struct uhab_context *ctx,
 		/* Wait for Ack sequence */
 		hab_open_request_init(&request, HAB_PAYLOAD_TYPE_ACK,
 				pchan, 0, sub_id, open_id);
-		ret = hab_open_listen(ctx, dev, &request, &recv_request, 0);
+		ret = hab_open_listen(ctx, dev, &request, &recv_request,
+			HAB_HS_TIMEOUT);
 
 		if (ret != -EAGAIN)
 			break;
@@ -316,8 +320,9 @@ long hab_vchan_send(struct uhab_context *ctx,
 	struct hab_header header = HAB_HEADER_INITIALIZER;
 	int nonblocking_flag = flags & HABMM_SOCKET_SEND_FLAGS_NON_BLOCKING;
 
-	if (sizebytes > HAB_MAX_MSG_SIZEBYTES) {
-		pr_err("Message too large, %lu bytes\n", sizebytes);
+	if (sizebytes > HAB_HEADER_SIZE_MASK) {
+		pr_err("Message too large, %lu bytes, max is %d\n",
+			sizebytes, HAB_HEADER_SIZE_MASK);
 		return -EINVAL;
 	}
 
@@ -328,11 +333,17 @@ long hab_vchan_send(struct uhab_context *ctx,
 	}
 
 	HAB_HEADER_SET_SIZE(header, sizebytes);
-	if (flags & HABMM_SOCKET_SEND_FLAGS_XING_VM_STAT)
+	if (flags & HABMM_SOCKET_SEND_FLAGS_XING_VM_STAT) {
 		HAB_HEADER_SET_TYPE(header, HAB_PAYLOAD_TYPE_PROFILE);
-	else
+		if (sizebytes < sizeof(struct habmm_xing_vm_stat)) {
+			pr_err("wrong profiling buffer size %d, expect %zd!\n",
+				sizebytes,
+				sizeof(struct habmm_xing_vm_stat));
+			return -EINVAL;
+		}
+	} else {
 		HAB_HEADER_SET_TYPE(header, HAB_PAYLOAD_TYPE_MSG);
-
+	}
 	HAB_HEADER_SET_ID(header, vchan->otherend_id);
 	HAB_HEADER_SET_SESSION_ID(header, vchan->session_id);
 
@@ -345,7 +356,6 @@ long hab_vchan_send(struct uhab_context *ctx,
 
 		schedule();
 	}
-
 
 err:
 	if (vchan)
@@ -376,14 +386,20 @@ struct hab_message *hab_vchan_recv(struct uhab_context *ctx,
 		physical_channel_rx_dispatch((unsigned long) vchan->pchan);
 	}
 
-	message = hab_msg_dequeue(vchan, !nonblocking_flag);
+	ret = hab_msg_dequeue(vchan, &message, !nonblocking_flag);
 	if (!message) {
-		if (nonblocking_flag)
+		if (nonblocking_flag) {
 			ret = -EAGAIN;
-		else if (vchan->otherend_closed)
+		} else if (vchan->otherend_closed) {
 			ret = -ENODEV;
-		else
+		} else if (ret == -EAGAIN) {
+			/* user can retry */
+		} else {
+			/* unknown error */
 			ret = -EPIPE;
+		}
+	} else {
+		ret = 0;
 	}
 
 	hab_vchan_put(vchan);

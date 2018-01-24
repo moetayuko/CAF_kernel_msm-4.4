@@ -63,7 +63,7 @@ static int hab_export_ack_wait(struct uhab_context *ctx,
 
 	ret = wait_event_interruptible_timeout(ctx->exp_wq,
 		hab_export_ack_find(ctx, expect_ack),
-		HZ);
+		HAB_HS_TIMEOUT);
 	if (!ret || (ret == -ERESTARTSYS))
 		ret = -EAGAIN;
 	else if (ret > 0)
@@ -229,8 +229,6 @@ int hab_mem_export(struct uhab_context *ctx,
 	if (!ctx || !param || param->sizebytes > HAB_MAX_EXPORT_SIZE)
 		return -EINVAL;
 
-	pr_debug("vc %X, mem size %d\n", param->vcid, param->sizebytes);
-
 	vchan = hab_get_vchan_fromvcid(param->vcid, ctx);
 	if (!vchan || !vchan->pchan) {
 		ret = -ENODEV;
@@ -306,10 +304,7 @@ int hab_mem_unexport(struct uhab_context *ctx,
 		return -EINVAL;
 
 	ret = habmem_hyp_revoke(exp->payload, exp->payload_count);
-	if (ret) {
-		pr_err("Error found in revoke grant with ret %d", ret);
-		return ret;
-	}
+
 	habmem_remove_export(exp);
 	return ret;
 }
@@ -341,10 +336,6 @@ int hab_mem_import(struct uhab_context *ctx,
 		return ret;
 	}
 
-	pr_debug("call map id: %d pcnt %d remote_dom %d 1st_ref:0x%X\n",
-		exp->export_id, exp->payload_count, exp->domid_local,
-		*((uint32_t *)exp->payload));
-
 	ret = habmem_imp_hyp_map(ctx->import_ctx,
 		exp->payload,
 		exp->payload_count,
@@ -359,8 +350,6 @@ int hab_mem_import(struct uhab_context *ctx,
 			exp->domid_local, *((uint32_t *)exp->payload));
 		return ret;
 	}
-	pr_debug("import index %llx, kva %llx, kernel %d\n",
-		exp->import_index, param->kva, kernel);
 
 	param->index = exp->import_index;
 	param->kva = (uint64_t)exp->kva;
@@ -385,9 +374,6 @@ int hab_mem_unimport(struct uhab_context *ctx,
 			list_del(&exp->node);
 			ctx->import_total--;
 			found = 1;
-
-			pr_debug("found id:%d payload cnt:%d kernel:%d\n",
-				exp->export_id, exp->payload_count, kernel);
 			break;
 		}
 	}
@@ -400,10 +386,7 @@ int hab_mem_unimport(struct uhab_context *ctx,
 			exp->import_index,
 			exp->payload_count,
 			kernel);
-		if (ret) {
-			pr_err("unmap fail id:%d pcnt:%d kernel:%d\n",
-				exp->export_id, exp->payload_count, kernel);
-		}
+
 		param->kva = (uint64_t)exp->kva;
 		kfree(exp);
 	}

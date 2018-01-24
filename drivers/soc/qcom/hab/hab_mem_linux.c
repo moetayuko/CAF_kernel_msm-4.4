@@ -294,6 +294,12 @@ long habmem_imp_hyp_map(void *imp_ctx,
 	}
 
 	pfn = pfn_table->first_pfn;
+	if (pfn_valid(pfn) == 0 ||  page_is_ram(pfn) == 0) {
+		pr_err("import sanity check failed on pfn %lx, valid %d, ram %d\n",
+			   pfn, pfn_valid(pfn), page_is_ram(pfn));
+		vfree(pages);
+		return -ENOMEM;
+	}
 	for (i = 0; i < pfn_table->nregions; i++) {
 		for (j = 0; j < pfn_table->region[i].size; j++) {
 			pages[k] = pfn_to_page(pfn+j);

@@ -131,6 +131,14 @@ struct hab_unimport {
 
 #define HABMM_IMPORT_FLAGS_CACHED 0x00000001
 
+struct habmm_xing_vm_stat {
+	uint64_t tx_sec;
+	uint64_t tx_usec;
+	uint64_t rx_sec;
+	uint64_t rx_usec;
+};
+
+
 #define IOCTL_HAB_SEND \
 	_IOW(HAB_IOC_TYPE, 0x2, struct hab_send)
 

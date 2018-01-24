@@ -10,8 +10,8 @@
  * GNU General Public License for more details.
  *
  */
-#include <linux/module.h>
 #include "hab.h"
+#include <linux/module.h>
 
 int32_t habmm_socket_open(int32_t *handle, uint32_t mm_ip_id,
 		uint32_t timeout, uint32_t flags)

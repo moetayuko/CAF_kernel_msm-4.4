@@ -121,6 +121,8 @@ void hab_open_request_free(struct hab_open_request *request)
 	if (request) {
 		hab_pchan_put(request->pchan);
 		kfree(request);
+	} else {
+		pr_err("empty request found\n");
 	}
 }
 
@@ -132,8 +134,11 @@ int hab_open_listen(struct uhab_context *ctx,
 {
 	int ret = 0;
 
-	if (!ctx || !listen || !recv_request)
+	if (!ctx || !listen || !recv_request) {
+		pr_err("open listen failed ctx %p, listen %p, recv_request %p\n",
+			ctx, listen, recv_request);
 		return -EINVAL;
+	}
 
 	*recv_request = NULL;
 	if (ms_timeout > 0) {
@@ -147,6 +152,8 @@ int hab_open_listen(struct uhab_context *ctx,
 	} else {
 		ret = wait_event_interruptible(dev->openq,
 			hab_open_request_find(ctx, dev, listen, recv_request));
+		if (ctx->closing)
+			ret = -ENODEV;
 	}
 
 	return ret;

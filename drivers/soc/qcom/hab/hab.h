@@ -175,12 +175,14 @@ struct hab_header {
 
 #define HAB_HEADER_GET_SESSION_ID(header) ((header).session_id)
 
+#define HAB_HS_TIMEOUT (10*1000*1000)
+
 struct physical_channel {
+	struct list_head node;
 	char name[MAX_VMID_NAME_SIZE];
 	int is_be;
 	struct kref refcount;
 	struct hab_device *habdev;
-	struct list_head node;
 	struct idr vchan_idr;
 	spinlock_t vid_lock;
 
@@ -192,6 +194,10 @@ struct physical_channel {
 	int closed;
 
 	spinlock_t rxbuf_lock;
+
+	/* debug only */
+	uint32_t sequence_tx;
+	uint32_t sequence_rx;
 
 	/* vchans over this pchan */
 	struct list_head vchannels;
@@ -238,7 +244,7 @@ struct hab_message {
 
 struct hab_device {
 	char name[MAX_VMID_NAME_SIZE];
-	unsigned int id;
+	uint32_t id;
 	struct list_head pchannels;
 	int pchan_cnt;
 	struct mutex pchan_lock;
@@ -416,8 +422,8 @@ int habmem_imp_hyp_mmap(struct file *flip, struct vm_area_struct *vma);
 
 
 void hab_msg_free(struct hab_message *message);
-struct hab_message *hab_msg_dequeue(struct virtual_channel *vchan,
-		int wait_flag);
+int hab_msg_dequeue(struct virtual_channel *vchan,
+		struct hab_message **msg, int wait_flag);
 
 void hab_msg_recv(struct physical_channel *pchan,
 		struct hab_header *header);

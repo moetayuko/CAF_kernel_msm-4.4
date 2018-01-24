@@ -28,8 +28,11 @@ hab_msg_alloc(struct physical_channel *pchan, size_t sizebytes)
 	struct hab_message *message;
 
 	message = kzalloc(sizeof(*message) + sizebytes, GFP_ATOMIC);
-	if (!message)
+	if (!message) {
+		pr_err("Out of memory! failed to allocate %zd bytes\n",
+			sizeof(*message) + sizebytes);
 		return NULL;
+	}
 
 	message->sizebytes =
 		physical_channel_read(pchan, message->data, sizebytes);
@@ -42,8 +45,9 @@ void hab_msg_free(struct hab_message *message)
 	kfree(message);
 }
 
-struct hab_message *
-hab_msg_dequeue(struct virtual_channel *vchan, int wait_flag)
+int
+hab_msg_dequeue(struct virtual_channel *vchan, struct hab_message **msg,
+		int wait_flag)
 {
 	struct hab_message *message = NULL;
 	int ret = 0;
@@ -55,16 +59,31 @@ hab_msg_dequeue(struct virtual_channel *vchan, int wait_flag)
 				vchan->otherend_closed);
 	}
 
-	/* return all the received messages before the remote close */
-	if (!ret && !hab_rx_queue_empty(vchan)) {
+	if ((!ret || (ret == -ERESTARTSYS)) && !hab_rx_queue_empty(vchan)) {
 		spin_lock_bh(&vchan->rx_lock);
 		message = list_first_entry(&vchan->rx_list,
 				struct hab_message, node);
 		list_del(&message->node);
 		spin_unlock_bh(&vchan->rx_lock);
+		if (!message) {
+			pr_err("no message, ret %d, interrupted?\n", ret);
+			ret = -EAGAIN;
+		} else {
+			/* interrupted but msg still received */
+			ret = 0;
+		}
+	} else if (ret == -ERESTARTSYS) {
+		pr_err("vcid %X, remote vcid %X, no message, interrupted?\n",
+		vchan->id, vchan->otherend_id);
+		ret = -EAGAIN;
+	} else {
+		pr_err("ret %d, msg %p, other end closed %d, queue empty %d\n",
+			ret, message, vchan->otherend_closed,
+			hab_rx_queue_empty(vchan));
 	}
 
-	return message;
+	*msg = message;
+	return ret;
 }
 
 static void hab_msg_queue(struct virtual_channel *vchan,
@@ -125,11 +144,6 @@ static int hab_receive_create_export_ack(struct physical_channel *pchan,
 		&ack_recvd->ack,
 		sizebytes) != sizebytes)
 		return -EIO;
-
-	pr_debug("receive export id %d, local vc %X, vd remote %X\n",
-		ack_recvd->ack.export_id,
-		ack_recvd->ack.vcid_local,
-		ack_recvd->ack.vcid_remote);
 
 	spin_lock_bh(&ctx->expq_lock);
 	list_add_tail(&ack_recvd->node, &ctx->exp_rxq);
@@ -241,8 +255,8 @@ void hab_msg_recv(struct physical_channel *pchan,
 
 	case HAB_PAYLOAD_TYPE_CLOSE:
 		/* remote request close */
-		pr_debug("remote side request close\n");
-		pr_debug(" vchan id %X, other end %X, session %d\n",
+		pr_info("remote side request close\n");
+		pr_info(" vchan id %X, other end %X, session %d\n",
 				vchan->id, vchan->otherend_id, session_id);
 		hab_vchan_stop(vchan);
 		break;
@@ -253,13 +267,14 @@ void hab_msg_recv(struct physical_channel *pchan,
 		/* pull down the incoming data */
 		message = hab_msg_alloc(pchan, sizebytes);
 		if (!message) {
-			pr_err("msg alloc failed\n");
-			break;
+			pr_err("failed to allocate msg!Arrived msg will be lost!\n");
+		} else {
+			struct habmm_xing_vm_stat *pstat =
+				(struct habmm_xing_vm_stat *)message->data;
+			pstat->rx_sec = tv.tv_sec;
+			pstat->rx_usec = tv.tv_usec;
+			hab_msg_queue(vchan, message);
 		}
-
-		((uint64_t *)message->data)[2] = tv.tv_sec;
-		((uint64_t *)message->data)[3] = tv.tv_usec;
-		hab_msg_queue(vchan, message);
 		break;
 
 	default:
