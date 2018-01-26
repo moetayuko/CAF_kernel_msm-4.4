@@ -5462,7 +5462,7 @@ int afe_set_lpass_clk_cfg(int index, struct afe_clk_set *cfg)
 		 cfg->clk_id, cfg->clk_freq_in_hz, cfg->clk_attri,
 		 cfg->clk_root, cfg->enable);
 
-	ret = q6afe_svc_pack_and_set_param_in_band(index, param_hdr,
+	ret = q6afe_svc_pack_and_set_param_in_band(IDX_GLOBAL_CFG, param_hdr,
 						   (u8 *) cfg);
 	if (ret < 0)
 		pr_err("%s: AFE clk cfg failed with ret %d\n",
