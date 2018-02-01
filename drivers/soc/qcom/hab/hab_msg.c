@@ -76,10 +76,6 @@ hab_msg_dequeue(struct virtual_channel *vchan, struct hab_message **msg,
 		pr_err("vcid %X, remote vcid %X, no message, interrupted?\n",
 		vchan->id, vchan->otherend_id);
 		ret = -EAGAIN;
-	} else {
-		pr_err("ret %d, msg %p, other end closed %d, queue empty %d\n",
-			ret, message, vchan->otherend_closed,
-			hab_rx_queue_empty(vchan));
 	}
 
 	*msg = message;
