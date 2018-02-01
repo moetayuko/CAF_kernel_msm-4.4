@@ -1,6 +1,7 @@
 /*
  * Copyright (c) 2005-2011 Atheros Communications Inc.
  * Copyright (c) 2011-2017 Qualcomm Atheros, Inc.
+ * Copyright (c) 2018, The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -81,6 +82,8 @@ void ath10k_debug_print_hwfw_info(struct ath10k *ar)
 void ath10k_debug_print_board_info(struct ath10k *ar)
 {
 	char boardinfo[100];
+	const struct firmware *board;
+	u32 crc;
 
 	if (ar->id.bmi_ids_valid)
 		scnprintf(boardinfo, sizeof(boardinfo), "%d:%d",
@@ -88,11 +91,16 @@ void ath10k_debug_print_board_info(struct ath10k *ar)
 	else
 		scnprintf(boardinfo, sizeof(boardinfo), "N/A");
 
+	board = ar->normal_mode_fw.board;
+	if (!IS_ERR_OR_NULL(board))
+		crc = crc32_le(0, board->data, board->size);
+	else
+		crc = 0;
+
 	ath10k_info(ar, "board_file api %d bmi_id %s crc32 %08x",
 		    ar->bd_api,
 		    boardinfo,
-		    crc32_le(0, ar->normal_mode_fw.board->data,
-			     ar->normal_mode_fw.board->size));
+		    crc);
 }
 
 void ath10k_debug_print_boot_info(struct ath10k *ar)
@@ -2135,6 +2143,48 @@ static const struct file_operations fops_fw_checksums = {
 	.llseek = default_llseek,
 };
 
+static ssize_t ath10k_sta_tid_stats_mask_read(struct file *file,
+					      char __user *user_buf,
+					      size_t count, loff_t *ppos)
+{
+	struct ath10k *ar = file->private_data;
+	char buf[32];
+	size_t len;
+
+	len = scnprintf(buf, sizeof(buf), "0x%08x\n", ar->sta_tid_stats_mask);
+	return simple_read_from_buffer(user_buf, count, ppos, buf, len);
+}
+
+static ssize_t ath10k_sta_tid_stats_mask_write(struct file *file,
+					       const char __user *user_buf,
+					       size_t count, loff_t *ppos)
+{
+	struct ath10k *ar = file->private_data;
+	char buf[32];
+	ssize_t len;
+	u32 mask;
+
+	len = min(count, sizeof(buf) - 1);
+	if (copy_from_user(buf, user_buf, len))
+		return -EFAULT;
+
+	buf[len] = '\0';
+	if (kstrtoint(buf, 0, &mask))
+		return -EINVAL;
+
+	ar->sta_tid_stats_mask = mask;
+
+	return len;
+}
+
+static const struct file_operations fops_sta_tid_stats_mask = {
+	.read = ath10k_sta_tid_stats_mask_read,
+	.write = ath10k_sta_tid_stats_mask_write,
+	.open = simple_open,
+	.owner = THIS_MODULE,
+	.llseek = default_llseek,
+};
+
 int ath10k_debug_create(struct ath10k *ar)
 {
 	ar->debug.cal_data = vzalloc(ATH10K_DEBUG_CAL_DATA_LEN);
@@ -2249,6 +2299,11 @@ int ath10k_debug_register(struct ath10k *ar)
 
 	debugfs_create_file("fw_checksums", 0400, ar->debug.debugfs_phy, ar,
 			    &fops_fw_checksums);
+
+	if (IS_ENABLED(CONFIG_MAC80211_DEBUGFS))
+		debugfs_create_file("sta_tid_stats_mask", 0600,
+				    ar->debug.debugfs_phy,
+				    ar, &fops_sta_tid_stats_mask);
 
 	return 0;
 }
